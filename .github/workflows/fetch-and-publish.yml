@@ -1,0 +1,72 @@
+name: Fetch Runalyze data and publish to GitHub Pages
+
+# run daily at midnight UTC and allow manual runs
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install playwright
+          # install browsers (headless)
+          playwright install --with-deps
+
+      - name: Prepare storage files from secrets
+        env:
+          STORAGE_ALICE: ${{ secrets.STORAGE_ALICE }}
+          STORAGE_BOB: ${{ secrets.STORAGE_BOB }}
+        run: |
+          mkdir -p tmp
+          if [ -n "$STORAGE_ALICE" ]; then
+            echo "Writing storage_alice.json"
+            echo "$STORAGE_ALICE" | base64 --decode > tmp/storage_alice.json
+          else
+            echo "STORAGE_ALICE secret not set"
+          fi
+          if [ -n "$STORAGE_BOB" ]; then
+            echo "Writing storage_bob.json"
+            echo "$STORAGE_BOB" | base64 --decode > tmp/storage_bob.json
+          else
+            echo "STORAGE_BOB secret not set"
+          fi
+
+      - name: Run fetch script for each account
+        env:
+          PYTHONUNBUFFERED: 1
+        run: |
+          mkdir -p docs/data
+          # adjust dates if desired or pass via env/secrets
+          python scripts/ci_fetch_runalyze.py --storage tmp/storage_alice.json --user alice --from-date 2025-08-10 --to-date 2025-11-08 || echo "alice fetch failed"
+          python scripts/ci_fetch_runalyze.py --storage tmp/storage_bob.json   --user bob   --from-date 2025-08-10 --to-date 2025-11-08 || echo "bob fetch failed"
+          ls -la docs/data || true
+
+      - name: Commit and push updated docs
+        env:
+          GIT_COMMITTER_NAME: "github-actions[bot]"
+          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+        run: |
+          git config user.name "${GIT_COMMITTER_NAME}"
+          git config user.email "${GIT_COMMITTER_EMAIL}"
+          git add docs/data || true
+          git commit -m "ci: update runalyze data (automated)" || echo "No changes to commit"
+          git push
