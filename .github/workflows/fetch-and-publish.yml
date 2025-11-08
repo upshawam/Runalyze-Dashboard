@@ -55,9 +55,9 @@ jobs:
           PYTHONUNBUFFERED: 1
         run: |
           mkdir -p docs/data
-          # adjust dates if desired or pass via env/secrets
-          python play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
-          python play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
+          # call the script inside the scripts/ directory
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
           ls -la docs/data || true
 
       - name: Commit and push updated docs
