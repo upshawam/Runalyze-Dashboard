@@ -33,21 +33,21 @@ jobs:
 
       - name: Prepare storage files from secrets
         env:
-          STORAGE_ALICE: ${{ secrets.STORAGE_ALICE }}
-          STORAGE_BOB: ${{ secrets.STORAGE_BOB }}
+          STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
+          STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
         run: |
           mkdir -p tmp
-          if [ -n "$STORAGE_ALICE" ]; then
-            echo "Writing storage_alice.json"
-            echo "$STORAGE_ALICE" | base64 --decode > tmp/storage_alice.json
+          if [ -n "$STORAGE_KRISTIN" ]; then
+            echo "Writing storage_kristin.json"
+            echo "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json
           else
-            echo "STORAGE_ALICE secret not set"
+            echo "STORAGE_KRISTIN secret not set"
           fi
-          if [ -n "$STORAGE_BOB" ]; then
-            echo "Writing storage_bob.json"
-            echo "$STORAGE_BOB" | base64 --decode > tmp/storage_bob.json
+          if [ -n "$STORAGE_AARON" ]; then
+            echo "Writing storage_aaron.json"
+            echo "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json
           else
-            echo "STORAGE_BOB secret not set"
+            echo "STORAGE_AARON secret not set"
           fi
 
       - name: Run fetch script for each account
@@ -56,8 +56,8 @@ jobs:
         run: |
           mkdir -p docs/data
           # adjust dates if desired or pass via env/secrets
-          python scripts/ci_fetch_runalyze.py --storage tmp/storage_alice.json --user alice --from-date 2025-08-10 --to-date 2025-11-08 || echo "alice fetch failed"
-          python scripts/ci_fetch_runalyze.py --storage tmp/storage_bob.json   --user bob   --from-date 2025-08-10 --to-date 2025-11-08 || echo "bob fetch failed"
+          python play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
+          python play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
           ls -la docs/data || true
 
       - name: Commit and push updated docs
