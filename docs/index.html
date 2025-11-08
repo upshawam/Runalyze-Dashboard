@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Runalyze Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 24px; }
+    #controls { margin-bottom: 12px; }
+    canvas { max-width: 1000px; margin-bottom: 28px; }
+  </style>
+</head>
+<body>
+  <h1>Runalyze Dashboard (static)</h1>
+  <div id="controls">
+    <label>User A: <input id="userA" value="alice"></label>
+    <label>User B: <input id="userB" value="bob"></label>
+    <button onclick="refresh()">Refresh</button>
+  </div>
+
+  <h2>Marathon shape</h2>
+  <canvas id="chartMarathon" height="120"></canvas>
+
+  <h2>VO2max (trend)</h2>
+  <canvas id="chartVo2" height="120"></canvas>
+
+  <script>
+    const ctxM = document.getElementById('chartMarathon').getContext('2d');
+    const ctxV = document.getElementById('chartVo2').getContext('2d');
+
+    const chartM = new Chart(ctxM, {
+      type: 'line',
+      data: { datasets: [] },
+      options: {
+        parsing: false,
+        scales: { x: { type: 'time', time: { unit: 'day' }}, y: { beginAtZero: true } }
+      }
+    });
+
+    const chartV = new Chart(ctxV, {
+      type: 'line',
+      data: { datasets: [] },
+      options: { parsing: false, scales: { x: { type: 'time', time: { unit: 'day' } } } }
+    });
+
+    async function fetchJSON(path) {
+      try {
+        const r = await fetch(path + '?t=' + Date.now());
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        console.error('fetch error', e);
+        return null;
+      }
+    }
+
+    function trendToPoints(trendObj) {
+      // trendObj can be object of date->value (as returned by vo2 trend) or nested data.data depending on payload.
+      if (!trendObj) return [];
+      // If trendObj is nested under .data (marathon endpoint), handle both shapes.
+      const obj = trendObj.data || trendObj.trend || trendObj;
+      const entries = Object.entries(obj).map(([d, v]) => ({ x: d, y: v }));
+      entries.sort((a,b) => a.x.localeCompare(b.x));
+      return entries;
+    }
+
+    async function refresh() {
+      const a = document.getElementById('userA').value || 'alice';
+      const b = document.getElementById('userB').value || 'bob';
+      const mA = await fetchJSON(`docs/data/${a}_marathon.json`);
+      const mB = await fetchJSON(`docs/data/${b}_marathon.json`);
+      chartM.data.datasets = [];
+      if (mA) chartM.data.datasets.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
+      if (mB) chartM.data.datasets.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
+      chartM.update();
+
+      const vA = await fetchJSON(`docs/data/${a}_vo2.json`);
+      const vB = await fetchJSON(`docs/data/${b}_vo2.json`);
+      chartV.data.datasets = [];
+      if (vA && vA.trend) chartV.data.datasets.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
+      if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
+      chartV.update();
+    }
+
+    // initial load
+    refresh();
+  </script>
+</body>
+</html>
