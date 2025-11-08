@@ -7,17 +7,17 @@ and a convenience fetch command to use that storage_state to fetch Runalyze inte
 JSON endpoints (marathon-shape and vo2max).
 
 Usage (interactive login -> produce storage JSON):
-  python play_fetch_runalyze.py login --storage storage_kristin.json
+  python scripts/play_fetch_runalyze.py login --storage storage_kristin.json
 
 Usage (headless fetch using an existing storage JSON):
-  python play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin \
+  python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin \
     --from-date 2025-08-10 --to-date 2025-11-08
 
 Notes:
  - Install Playwright: pip install playwright
  - Install browsers: playwright install
  - login opens a visible browser so you can sign in and complete 2FA if required.
- - fetch runs headless using the saved storage_state file and writes JSON to data/<user>_marathon.json and data/<user>_vo2.json
+ - fetch runs headless using the saved storage_state file and writes JSON to docs/data/<user>_marathon.json and docs/data/<user>_vo2.json
 """
 import argparse
 import json
@@ -27,8 +27,9 @@ import calendar
 import sys
 from playwright.sync_api import sync_playwright
 
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
+# Write fetched data into docs/data so the workflow can commit it for GitHub Pages
+DATA_DIR = Path("docs/data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 MARATHON_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/marathon-shape/{from_date}/{to_date}"
 VO2_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/vo2max/{from_ts}/{to_ts}"
