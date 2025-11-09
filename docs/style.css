@@ -1,6 +1,7 @@
 /* Centralized styles for the Runalyze-like tables and page
-   Updated: hide Prognosis/Optimum only on very small screens (<=480px).
-   Keep table natural widths + horizontal scroll so rotated phones can show all columns.
+   Updated for reordered columns:
+   Distance | Achieved | Icon | Prognosis | Optimum | Marathon Shape | Weekly mileage | Long Run
+   Use classes (weekly-col, hidden-mobile) for robust sizing.
 */
 
 :root{
@@ -33,19 +34,17 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 
 /* Container: allow horizontal scroll if table is wider than viewport */
 .tables-wrap { max-width:var(--page-max-width); margin:6px auto 24px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-
-/* Keep a thin padding around the table block */
 .rz-wrapper { padding:6px 0; }
 
-/* Let the table decide its natural widths (auto layout), and shrink to content */
+/* Use auto layout and inline-table so table shrinks to content */
 .rz-table{
-  display:inline-table;      /* shrink-to-content */
-  table-layout: auto;        /* let browser compute column width based on content */
+  display:inline-table;
+  table-layout:auto;
   font-size:0.92rem;
   color:#333;
   background:#fff;
   border-collapse:collapse;
-  margin: 0;
+  margin:0;
 }
 
 /* Group header row */
@@ -71,11 +70,9 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
   white-space:nowrap;
 }
 
-/* vertical dividers between column groups */
-.rz-table thead tr.label-row th:nth-child(2),
-.rz-table tbody td:nth-child(2){ border-left:1px solid var(--border); }
-.rz-table thead tr.label-row th:nth-child(5),
-.rz-table tbody td:nth-child(5){ border-left:1px solid var(--border); }
+/* vertical divider at start of the Required group (Marathon Shape column is now the first of required) */
+.rz-table thead tr.label-row th:nth-child(6),
+.rz-table tbody td:nth-child(6){ border-left:1px solid var(--border); }
 
 /* cell spacing (compact) */
 .rz-table tbody td{
@@ -87,21 +84,19 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
   white-space:nowrap;
 }
 
-/* allow weekly mileage (3rd column) to wrap within a constrained width */
-.rz-table tbody td:nth-child(3),
-.rz-table thead th:nth-child(3) {
+/* weekly-col: constrain and allow wrapping */
+.rz-table thead th.weekly-col,
+.rz-table td.weekly-col{
   white-space:normal;
-  max-width:180px;      /* constrain weekly mileage column */
+  max-width:180px;
   word-break:break-word;
 }
 
-/* constrain prognosis/optimum to smaller space and allow wrapping */
-.rz-table tbody td:nth-child(7),
-.rz-table thead th:nth-child(7),
-.rz-table tbody td:nth-child(8),
-.rz-table thead th:nth-child(8) {
+/* constrain prognosis/optimum cells using the hidden-mobile class (robust to reordering) */
+.rz-table th.hidden-mobile,
+.rz-table td.hidden-mobile{
   white-space:normal;
-  max-width:120px;      /* narrower for prognosis/optimum */
+  max-width:120px;
   word-break:break-word;
 }
 
@@ -112,40 +107,28 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 /* distance column: bold, compact */
 .rz-table tbody td:nth-child(1){ font-weight:700; white-space:nowrap; padding-left:8px; }
 
-/* achieved column: centered and compact */
-.rz-table tbody td:nth-child(5){ text-align:center; white-space:nowrap; padding-right:8px; }
-
-/* center helper */
-.center{ text-align:center; }
-
-/* hide certain columns only on very small screens */
-.hidden-mobile{ display:table-cell; }
-/* SMALLER breakpoint: only hide on tiny phones <=480px */
-@media (max-width:480px){
-  .hidden-mobile{ display:none; }
-  /* when hidden, allow table to shrink further */
-  .rz-table tbody td:nth-child(7),
-  .rz-table thead th:nth-child(7),
-  .rz-table tbody td:nth-child(8),
-  .rz-table thead th:nth-child(8) { max-width: 1px; }
-}
+/* achieved column: centered and compact (now column 2) */
+.rz-table tbody td:nth-child(2){ text-align:center; white-space:nowrap; padding-right:8px; }
 
 /* small helper text */
 .small{ font-size:0.85rem; color:var(--muted); margin:0; padding:0; }
 
-/* marathon goal separators */
+/* marathon goal separators and shading */
 .top-separated td{ border-top:1.6px solid var(--strong-sep); }
 .bottom-separated td{ border-bottom:1.6px solid var(--strong-sep); }
-
-/* MARATHON GOAL: distinct shade so the goal row is visually obvious */
-.marathon-goal td{
-  background: var(--marathon-shade) !important;
-}
+.marathon-goal td{ background: var(--marathon-shade) !important; }
 
 /* icons */
 .fa-check.plus, .plus{ color:var(--accent-ok); font-weight:700; }
 .fa-xmark.minus, .minus{ color:var(--accent-bad); font-weight:700; }
 .fa-solid{ font-size:0.95rem; vertical-align:middle; }
+
+/* hide certain columns only on very small screens */
+.hidden-mobile{ display:table-cell; }
+@media (max-width:480px){
+  .hidden-mobile{ display:none; }
+  .rz-table th.hidden-mobile, .rz-table td.hidden-mobile { max-width:1px; }
+}
 
 /* user header compact */
 .user-block{ display:flex; justify-content:space-between; align-items:flex-start; margin:8px 0 4px; gap:8px; }
