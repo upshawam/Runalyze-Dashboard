@@ -1,7 +1,6 @@
 /* Centralized styles for the Runalyze-like tables and page
-   Updated: remove table-layout:fixed/colgroup approach, let browser size columns,
-   constrain Weekly / Prognosis / Optimum with max-widths and wrapping,
-   display:inline-table so table shrinks to content and doesn't stretch.
+   Updated: hide Prognosis/Optimum only on very small screens (<=480px).
+   Keep table natural widths + horizontal scroll so rotated phones can show all columns.
 */
 
 :root{
@@ -38,7 +37,7 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 /* Keep a thin padding around the table block */
 .rz-wrapper { padding:6px 0; }
 
-/* Let the table decide its own natural widths (auto layout), and shrink to content */
+/* Let the table decide its natural widths (auto layout), and shrink to content */
 .rz-table{
   display:inline-table;      /* shrink-to-content */
   table-layout: auto;        /* let browser compute column width based on content */
@@ -46,7 +45,7 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
   color:#333;
   background:#fff;
   border-collapse:collapse;
-  margin: 0;                 /* no extra margins (table width now only its content) */
+  margin: 0;
 }
 
 /* Group header row */
@@ -85,7 +84,7 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
   vertical-align:middle;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap; /* default: single line to keep rows tight */
+  white-space:nowrap;
 }
 
 /* allow weekly mileage (3rd column) to wrap within a constrained width */
@@ -119,9 +118,10 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 /* center helper */
 .center{ text-align:center; }
 
-/* hide certain columns on narrow screens */
+/* hide certain columns only on very small screens */
 .hidden-mobile{ display:table-cell; }
-@media (max-width:920px){
+/* SMALLER breakpoint: only hide on tiny phones <=480px */
+@media (max-width:480px){
   .hidden-mobile{ display:none; }
   /* when hidden, allow table to shrink further */
   .rz-table tbody td:nth-child(7),
