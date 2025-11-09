@@ -5,7 +5,12 @@
   <title>VO₂ Max & Marathon Shape</title>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+  <!-- Font Awesome for the check/x icons to match Runalyze -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
 
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 20px; background: #fafafa; color:#111; }
@@ -15,29 +20,42 @@
     .chart-wrap { max-width:1200px; margin:20px auto; }
     canvas { width:100% !important; height:360px !important; display:block; background:#fff; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
 
-    /* Tighter table spacing for improved readability */
+    /* Runalyze-style marathon table (compact/tidy) */
     .rz-table { width:100%; max-width:1100px; margin:10px auto 20px; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); font-size:0.95rem; }
-    .rz-table thead th { background:#f6f8fb; padding:8px 10px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
-    .rz-table tbody td { padding:8px 10px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
-    .rz-table tbody tr:nth-child(odd) { background:#fff; }
-    .rz-table tbody tr:nth-child(even) { background:#fbfcfe; }
-    .right-separated { border-right:1px solid #eef2f7; }
-    .left-separated { border-left:1px solid #eef2f7; }
-    .b { font-weight:700; }
-    .plus { color: #1a9a42; } /* achieved check color */
-    .minus { color: #c0392b; } /* not achieved color */
-    .small { font-size:0.88rem; color:#666; }
+    .rz-table thead th { background:#f6f8fb; padding:10px 12px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
+    .rz-table tbody td { padding:12px 12px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
+    .rz-table tbody tr.r { line-height:1.3; }
 
-    .user-block { max-width:1200px; margin: 8px auto 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .user-title { font-size:1.05rem; font-weight:700; margin-bottom:2px; }
-
-    /* Slightly narrower distance/achieved columns for compact layout */
-    .rz-table td:nth-child(1), .rz-table th:nth-child(1) { width:16%; white-space:nowrap; }
+    /* Narrower first column and Achieved column for compact layout */
+    .rz-table td:nth-child(1), .rz-table th:nth-child(1) { width:18%; white-space:nowrap; }
     .rz-table td:nth-child(5), .rz-table th:nth-child(5) { width:12%; text-align:center; }
 
-    /* Subtle per-user column shading:
-       Kristin -> light purple, Aaron -> light green
-    */
+    /* separators */
+    .right-separated { border-right:1px solid #eef2f7; padding-right:12px; }
+    .left-separated { border-left:1px solid #eef2f7; padding-left:12px; }
+
+    /* top / bottom heavier separators */
+    .top-separated td { border-top:2px solid #e6eef8; }
+    .bottom-separated td { border-bottom:2px solid #e6eef8; }
+
+    /* bold distance cell */
+    .rz-table .b { font-weight:700; }
+
+    /* icon colors */
+    .fa-check.plus, .plus { color: #1a9a42; }
+    .fa-xmark.minus, .minus { color: #c0392b; }
+
+    /* hidden on small screens */
+    .hidden-mobile { display:table-cell; }
+    @media (max-width:900px){
+      .hidden-mobile { display:none; }
+      .rz-table tbody td { padding:10px 8px; }
+      .rz-table td:nth-child(1), .rz-table th:nth-child(1),
+      .rz-table td:nth-child(5), .rz-table th:nth-child(5) { width:auto; }
+      .user-block { flex-direction:column; align-items:flex-start; gap:6px; }
+    }
+
+    /* subtle per-user column shading */
     .user-kristin .rz-table tbody td:nth-child(1),
     .user-kristin .rz-table tbody td:nth-child(5),
     .user-kristin .rz-table thead th:nth-child(1),
@@ -51,14 +69,12 @@
       background: rgba(40,180,99,0.05);
     }
 
-    /* small responsive tweak */
-    @media (max-width:900px){
-      .rz-table { width:100%; font-size:0.92rem; }
-      .rz-table td, .rz-table th { padding:8px; }
-      .rz-table td:nth-child(1), .rz-table th:nth-child(1),
-      .rz-table td:nth-child(5), .rz-table th:nth-child(5) { width:auto; }
-      .user-block { flex-direction:column; align-items:flex-start; gap:6px; }
-    }
+    .user-block { max-width:1200px; margin: 8px auto 6px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .user-title { font-size:1.05rem; font-weight:700; margin-bottom:2px; }
+    .small { font-size:0.88rem; color:#666; }
+
+    /* Ensure non-breaking for 'mi' labels */
+    .nowrap-mi { white-space:nowrap; }
   </style>
 </head>
 <body>
