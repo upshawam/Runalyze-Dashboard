@@ -15,9 +15,10 @@
     .chart-wrap { max-width:1200px; margin:20px auto; }
     canvas { width:100% !important; height:360px !important; display:block; background:#fff; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
 
-    .rz-table { width:100%; max-width:1100px; margin:10px auto 20px; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
-    .rz-table thead th { background:#f6f8fb; padding:10px 12px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
-    .rz-table tbody td { padding:10px 12px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
+    /* Tighter table spacing for improved readability */
+    .rz-table { width:100%; max-width:1100px; margin:10px auto 20px; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); font-size:0.95rem; }
+    .rz-table thead th { background:#f6f8fb; padding:8px 10px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
+    .rz-table tbody td { padding:8px 10px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
     .rz-table tbody tr:nth-child(odd) { background:#fff; }
     .rz-table tbody tr:nth-child(even) { background:#fbfcfe; }
     .right-separated { border-right:1px solid #eef2f7; }
@@ -25,30 +26,38 @@
     .b { font-weight:700; }
     .plus { color: #1a9a42; } /* achieved check color */
     .minus { color: #c0392b; } /* not achieved color */
-    .small { font-size:0.9rem; color:#666; }
+    .small { font-size:0.88rem; color:#666; }
 
     .user-block { max-width:1200px; margin: 8px auto 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .user-title { font-size:1.05rem; font-weight:700; margin-bottom:2px; }
+
+    /* Slightly narrower distance/achieved columns for compact layout */
+    .rz-table td:nth-child(1), .rz-table th:nth-child(1) { width:16%; white-space:nowrap; }
+    .rz-table td:nth-child(5), .rz-table th:nth-child(5) { width:12%; text-align:center; }
 
     /* Subtle per-user column shading:
        Kristin -> light purple, Aaron -> light green
-       Shade Distance (col 1) and Achieved (col 5) columns for visual emphasis.
     */
     .user-kristin .rz-table tbody td:nth-child(1),
     .user-kristin .rz-table tbody td:nth-child(5),
     .user-kristin .rz-table thead th:nth-child(1),
     .user-kristin .rz-table thead th:nth-child(5) {
-      background: rgba(153,102,255,0.06);
+      background: rgba(153,102,255,0.05);
     }
     .user-aaron .rz-table tbody td:nth-child(1),
     .user-aaron .rz-table tbody td:nth-child(5),
     .user-aaron .rz-table thead th:nth-child(1),
     .user-aaron .rz-table thead th:nth-child(5) {
-      background: rgba(40,180,99,0.06);
+      background: rgba(40,180,99,0.05);
     }
 
     /* small responsive tweak */
     @media (max-width:900px){
-      .rz-table { width:100%; }
+      .rz-table { width:100%; font-size:0.92rem; }
+      .rz-table td, .rz-table th { padding:8px; }
+      .rz-table td:nth-child(1), .rz-table th:nth-child(1),
+      .rz-table td:nth-child(5), .rz-table th:nth-child(5) { width:auto; }
+      .user-block { flex-direction:column; align-items:flex-start; gap:6px; }
     }
   </style>
 </head>
