@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>VO₂ Max & Marathon Shape Comparison</title>
+  <title>VO₂ Max & Marathon Shape</title>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -23,33 +23,34 @@
     canvas { width:100% !important; height:360px !important; display:block; background: #fff; border-radius:6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 
     h2 { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:0 0 12px 0; }
-    .mar-pct { font-size:0.95rem; color:#222; font-weight:700; }
     .status { display: none; } /* hidden visually but kept for accessibility if needed */
     .error { color:#b00; font-weight:700; margin-top:8px; text-align:center; }
 
-    /* marathon header / progress */
-    .prog-header { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1200px; margin:0 auto 8px; }
-    .progress-wrap { display:flex; align-items:center; gap:8px; }
-    .progress-bar-outer { width:220px; background:#eee; border-radius:6px; height:10px; overflow:hidden; position:relative; }
-    .progress-bar-inner { height:100%; width:0%; background:linear-gradient(90deg,#2e86de,#2ec4b6); transition: width 400ms ease; }
-    .progress-over { position:absolute; right:6px; top:-18px; font-size:12px; color:#2e86de; display:none; }
+    /* Runalyze-style table (zebra-ish) */
+    .rz-table { width:100%; max-width:1100px; margin:10px auto 20px; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+    .rz-table thead th { background:#f6f8fb; padding:10px 12px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
+    .rz-table tbody td { padding:10px 12px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
+    .rz-table tbody tr:nth-child(odd) { background:#fff; }
+    .rz-table tbody tr:nth-child(even) { background:#fbfcfe; }
+    .right-separated { border-right:1px solid #eef2f7; }
+    .left-separated { border-left:1px solid #eef2f7; }
+    .b { font-weight:700; }
+    .plus { color: #1a9a42; } /* achieved check color */
+    .minus { color: #c0392b; } /* not achieved color */
+    .small { font-size:0.9rem; color:#666; }
 
-    /* prognosis table */
-    .prog-table { width:100%; max-width:800px; margin:10px auto 0; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
-    .prog-table th, .prog-table td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left; }
-    .prog-table th { background:#f6f8fb; font-weight:700; }
+    .user-block { max-width:1200px; margin: 8px auto 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .user-title { font-weight:700; }
 
-    @media (max-width:700px) {
-      canvas { height:300px !important; }
-      h2 { flex-direction:column; align-items:flex-start; gap:6px; }
-      .prog-table th, .prog-table td { padding:6px 8px; }
-      .progress-bar-outer { width:160px; }
+    @media (max-width:900px){
+      .prog-columns { display:block; }
+      .rz-table { width:100%; }
     }
   </style>
 </head>
 <body>
   <div class="page-title">VO₂ Max & Marathon Shape</div>
-  <div class="note">Displays the last 30 days. Data loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json (workflow).</div>
+  <div class="note">Displays VO₂ trend and a Runalyze-style Marathon Shape requirements table for each user. Data is loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json.</div>
 
   <div id="errors" class="error" aria-live="polite"></div>
   <div id="status" class="status" aria-live="polite"></div>
@@ -59,39 +60,8 @@
     <canvas id="vo2Chart" role="img" aria-label="VO2 Max trend chart"></canvas>
   </section>
 
-  <section class="chart-wrap" aria-labelledby="mar-title">
-    <!-- Marathon header with percent badge, progress bar and projection -->
-    <div class="prog-header">
-      <h2 id="mar-title" style="margin:0">Marathon Shape (last 30 days)</h2>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-        <div id="marathonPct" class="mar-pct">Kristin: --% &nbsp;&nbsp; Aaron: --%</div>
-
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="font-size:0.85rem;color:#666;">Progress</div>
-          <div style="position:relative;">
-            <div class="progress-bar-outer" aria-hidden="true">
-              <div id="marProgressBar" class="progress-bar-inner"></div>
-              <div id="marOverflow" class="progress-over">+0%</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="marProjection" style="font-size:0.85rem;color:#444;text-align:right;">Projected: --</div>
-      </div>
-    </div>
-
-    <canvas id="marathonChart" role="img" aria-label="Marathon shape chart"></canvas>
-
-    <!-- Prognosis table -->
-    <table id="prognosisTable" class="prog-table" aria-label="Prognosis predictions">
-      <thead>
-        <tr><th>Distance</th><th>Kristin (time / pace)</th><th>Aaron (time / pace)</th></tr>
-      </thead>
-      <tbody>
-        <tr><td colspan="3" style="text-align:center;color:#666">Loading prognosis…</td></tr>
-      </tbody>
-    </table>
-  </section>
+  <!-- Marathon Shape tables (one per user) -->
+  <div id="marathonTablesContainer"></div>
 
   <script src="app.js"></script>
 </body>
