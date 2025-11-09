@@ -182,9 +182,13 @@ async function loadAndRender(){
       const latest = findLatestValue(marMap);
       const currentPct = latest ? (latest.value * 100) : null;
 
-      // show last-updated timestamp from requirements JSON if available; fallback to prognosis _meta
+      // show last-updated: prefer marathon JSON _meta, then requirements, then prognosis
       let lastUpdated = null;
-      if(req && typeof req === 'object'){
+      if(data.marathon && typeof data.marathon === 'object'){
+        if(data.marathon._meta && data.marathon._meta.last_updated) lastUpdated = data.marathon._meta.last_updated;
+        else if(data.marathon.meta && data.marathon.meta.last_updated) lastUpdated = data.marathon.meta.last_updated;
+      }
+      if(!lastUpdated && req && typeof req === 'object'){
         if(req._meta && req._meta.last_updated) lastUpdated = req._meta.last_updated;
         else if(req.meta && req.meta.last_updated) lastUpdated = req.meta.last_updated;
       }
@@ -195,7 +199,15 @@ async function loadAndRender(){
 
       const lastUpdatedText = lastUpdated ? `<div class="small">Last updated: ${formatTimestamp(lastUpdated)}</div>` : '';
 
-      const userHeader = `<div class="user-block user-${u}"><div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct !== null ? (currentPct.toFixed(1)+'%') : 'N/A'} ${latest ? '('+latest.date+')' : ''}${lastUpdatedText}</div></div>`;
+      const userHeader = `
+        <div class="user-block user-${u}">
+          <div>
+            <div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div>
+            <div class="small">Latest marathon shape: ${currentPct !== null ? (Math.round(currentPct*100)/100) : 'N/A'}</div>
+          </div>
+          ${lastUpdatedText}
+        </div>
+      `;
 
       // Build rows HTML
       let rowsHtml = '';
