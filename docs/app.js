@@ -26,21 +26,21 @@ async function fetchJSON(path) {
   }
 }
 
-// Convert trend JSON (various shapes) into [{x: <ms>, y: <number>}...]
+// Convert trend JSON (various shapes) into [{x: <Date>, y: <number>}...]
 function trendToPoints(trendObj) {
   if (!trendObj) return [];
   const obj = trendObj.data || trendObj.trend || trendObj;
 
   const entries = Object.entries(obj).map(([k, v]) => {
-    // Normalize x -> milliseconds
+    // Normalize x -> Date object
     let x = null;
     if (/^\d+$/.test(k)) {
       let n = Number(k);
       if (n < 1e12) n = n * 1000; // seconds -> ms
-      x = n;
+      x = new Date(n);
     } else {
       const parsed = Date.parse(k);
-      x = isNaN(parsed) ? null : parsed;
+      x = isNaN(parsed) ? null : new Date(parsed);
     }
 
     // Normalize y
@@ -125,25 +125,15 @@ async function loadAndRender() {
     if (vB && vB.trend) dsV.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
     chartV.data.datasets = dsV;
 
-    // Debug logs to help diagnose empty plots
+    // Debug logs
     console.log('chartM datasets:', chartM.data.datasets);
     console.log('chartV datasets:', chartV.data.datasets);
     chartM.data.datasets.forEach(d=>console.log(d.label, 'points', d.data.length, d.data.slice(0,3)));
     chartV.data.datasets.forEach(d=>console.log(d.label, 'points', d.data.length, d.data.slice(0,3)));
 
     // Safely update charts
-    try {
-      chartM.update();
-    } catch (e) {
-      showError('ChartM update error: ' + e.message);
-      console.error(e);
-    }
-    try {
-      chartV.update();
-    } catch (e) {
-      showError('ChartV update error: ' + e.message);
-      console.error(e);
-    }
+    try { chartM.update(); } catch (e) { showError('ChartM update error: ' + e.message); console.error(e); }
+    try { chartV.update(); } catch (e) { showError('ChartV update error: ' + e.message); console.error(e); }
 
     if ((!mA && !mB) && (!vA && !vB)) showStatus('No data found for selected users.');
     else showStatus('Loaded');
