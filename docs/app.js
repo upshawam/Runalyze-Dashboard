@@ -114,23 +114,46 @@ async function loadAndRender() {
       fetchJSON(vBPath).catch(err => { showError(err.message); return null; })
     ]);
 
-    chartM.data.datasets = [];
-    if (mA) chartM.data.datasets.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
-    if (mB) chartM.data.datasets.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
-    chartM.update();
+    // Build datasets
+    const dsM = [];
+    if (mA) dsM.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
+    if (mB) dsM.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
+    chartM.data.datasets = dsM;
 
-    chartV.data.datasets = [];
-    if (vA && vA.trend) chartV.data.datasets.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
-    if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
-    chartV.update();
+    const dsV = [];
+    if (vA && vA.trend) dsV.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
+    if (vB && vB.trend) dsV.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
+    chartV.data.datasets = dsV;
+
+    // Debug logs to help diagnose empty plots
+    console.log('chartM datasets:', chartM.data.datasets);
+    console.log('chartV datasets:', chartV.data.datasets);
+    chartM.data.datasets.forEach(d=>console.log(d.label, 'points', d.data.length, d.data.slice(0,3)));
+    chartV.data.datasets.forEach(d=>console.log(d.label, 'points', d.data.length, d.data.slice(0,3)));
+
+    // Safely update charts
+    try {
+      chartM.update();
+    } catch (e) {
+      showError('ChartM update error: ' + e.message);
+      console.error(e);
+    }
+    try {
+      chartV.update();
+    } catch (e) {
+      showError('ChartV update error: ' + e.message);
+      console.error(e);
+    }
 
     if ((!mA && !mB) && (!vA && !vB)) showStatus('No data found for selected users.');
     else showStatus('Loaded');
   } catch (e) {
     showError('Unexpected error: ' + e.message);
     showStatus('Error');
+    console.error(e);
   }
 }
 
 // Wire up button and initial load
 refreshBtn.addEventListener('click', loadAndRender);
+window.addEventListener('load', loadAndRender);
