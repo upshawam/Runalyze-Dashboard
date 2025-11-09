@@ -3,18 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <title>Runalyze Dashboard</title>
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Luxon + Chart.js Luxon adapter (provides the date adapter Chart.js needs for time scales) -->
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.min.js"></script>
+
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 24px; }
     #controls { margin-bottom: 12px; }
     canvas { max-width: 1000px; margin-bottom: 28px; }
     .note { color: #666; font-size: 0.9rem; margin-bottom:8px; }
-    .error { color: #b00; font-weight: 600; }
+    .error { color: #b00; font-weight: 600; margin-top:6px; }
   </style>
 </head>
 <body>
   <h1>Runalyze Dashboard (static)</h1>
-  <div class="note">If charts are empty, confirm the JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
+  <div class="note">If charts are empty, confirm the JSON files exist at <code>/docs/data/&lt;user&gt;_marathon.json</code> and <code>/docs/data/&lt;user&gt;_vo2.json</code>.</div>
 
   <div id="controls">
     <label>User A: <input id="userA" value="kristin"></label>
@@ -38,26 +44,44 @@
     const ctxM = document.getElementById('chartMarathon').getContext('2d');
     const ctxV = document.getElementById('chartVo2').getContext('2d');
 
+    // Create charts after adapter is loaded (adapter script tag included above).
+    // Use 'time' scale — Luxon adapter will parse standard ISO date strings.
     const chartM = new Chart(ctxM, {
       type: 'line',
       data: { datasets: [] },
       options: {
         parsing: false,
-        scales: { x: { type: 'time', time: { unit: 'day' }}, y: { beginAtZero: true } }
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' }
+          },
+          y: { beginAtZero: true }
+        },
+        plugins: { legend: { display: true } }
       }
     });
 
     const chartV = new Chart(ctxV, {
       type: 'line',
       data: { datasets: [] },
-      options: { parsing: false, scales: { x: { type: 'time', time: { unit: 'day' } } } }
+      options: {
+        parsing: false,
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' }
+          }
+        },
+        plugins: { legend: { display: true } }
+      }
     });
 
     async function fetchJSON(path) {
       try {
         const r = await fetch(path + '?t=' + Date.now());
         if (!r.ok) {
-          const text = await r.text().catch(()=>'');
+          const text = await r.text().catch(()=> '');
           throw new Error(`${r.status} ${r.statusText} - ${text.slice(0,200)}`);
         }
         return await r.json();
@@ -78,10 +102,7 @@
       }
     }
 
-    function showStatus(text) {
-      statusEl.textContent = text;
-    }
-
+    function showStatus(text) { statusEl.textContent = text; }
     function showError(msg) {
       const el = document.createElement('div');
       el.className = 'error';
@@ -96,18 +117,18 @@
       const a = document.getElementById('userA').value.trim() || 'kristin';
       const b = document.getElementById('userB').value.trim() || 'aaron';
 
-      // Use absolute /data path (GitHub Pages publishes docs/ as site root in this repo)
-      const mAPath = `/data/${a}_marathon.json`;
-      const mBPath = `/data/${b}_marathon.json`;
-      const vAPath = `/data/${a}_vo2.json`;
-      const vBPath = `/data/${b}_vo2.json`;
+      // Use relative path "docs/data/..." (no leading slash) so fetch resolves correctly for GitHub Pages
+      const mAPath = `docs/data/${a}_marathon.json`;
+      const mBPath = `docs/data/${b}_marathon.json`;
+      const vAPath = `docs/data/${a}_vo2.json`;
+      const vBPath = `docs/data/${b}_vo2.json`;
 
       try {
         const [mA, mB, vA, vB] = await Promise.all([
           fetchJSON(mAPath).catch(err => { showError(err.message); return null; }),
           fetchJSON(mBPath).catch(err => { showError(err.message); return null; }),
           fetchJSON(vAPath).catch(err => { showError(err.message); return null; }),
-          fetchJSON(vBPath).catch(err => { showError(err.message); return null; }),
+          fetchJSON(vBPath).catch(err => { showError(err.message); return null; })
         ]);
 
         chartM.data.datasets = [];
@@ -120,11 +141,8 @@
         if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
         chartV.update();
 
-        if ((!mA && !mB) && (!vA && !vB)) {
-          showStatus('No data found for selected users.');
-        } else {
-          showStatus('Loaded');
-        }
+        if ((!mA && !mB) && (!vA && !vB)) showStatus('No data found for selected users.');
+        else showStatus('Loaded');
       } catch (e) {
         showError('Unexpected error: ' + e.message);
         showStatus('Error');
