@@ -4,29 +4,17 @@
   <meta charset="utf-8" />
   <title>VO₂ Max & Marathon Shape</title>
 
-  <!-- Chart.js -->
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-      margin: 20px;
-      background: #fafafa;
-      color: #111;
-    }
-
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 20px; background: #fafafa; color:#111; }
     .page-title { font-size:1.1rem; font-weight:700; margin-bottom:8px; }
     .note { color:#666; font-size:0.95rem; margin-bottom:14px; }
 
     .chart-wrap { max-width:1200px; margin:20px auto; }
-    canvas { width:100% !important; height:360px !important; display:block; background: #fff; border-radius:6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    canvas { width:100% !important; height:360px !important; display:block; background:#fff; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
 
-    h2 { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:0 0 12px 0; }
-    .status { display: none; } /* hidden visually but kept for accessibility if needed */
-    .error { color:#b00; font-weight:700; margin-top:8px; text-align:center; }
-
-    /* Runalyze-style table (zebra-ish) */
     .rz-table { width:100%; max-width:1100px; margin:10px auto 20px; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
     .rz-table thead th { background:#f6f8fb; padding:10px 12px; text-align:left; font-weight:700; border-bottom:1px solid #e9eef5; }
     .rz-table tbody td { padding:10px 12px; border-bottom:1px solid #f1f4f8; vertical-align:middle; }
@@ -40,28 +28,20 @@
     .small { font-size:0.9rem; color:#666; }
 
     .user-block { max-width:1200px; margin: 8px auto 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .user-title { font-weight:700; }
-
-    @media (max-width:900px){
-      .prog-columns { display:block; }
-      .rz-table { width:100%; }
-    }
   </style>
 </head>
 <body>
   <div class="page-title">VO₂ Max & Marathon Shape</div>
-  <div class="note">Displays VO₂ trend and a Runalyze-style Marathon Shape requirements table for each user. Data is loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json.</div>
+  <div class="note">Displays VO₂ trend and Runalyze-style Marathon Shape table per user. Data loaded from docs/data/<user>_*.json.</div>
 
-  <div id="errors" class="error" aria-live="polite"></div>
-  <div id="status" class="status" aria-live="polite"></div>
+  <div id="errors" style="color:#b00;font-weight:700"></div>
 
-  <section class="chart-wrap" aria-labelledby="vo2-title">
-    <h2 id="vo2-title">VO₂ Max Trend (last 30 days)</h2>
-    <canvas id="vo2Chart" role="img" aria-label="VO2 Max trend chart"></canvas>
+  <section class="chart-wrap">
+    <h2>VO₂ Max Trend (last 30 days)</h2>
+    <canvas id="vo2Chart" aria-label="VO2 trend"></canvas>
   </section>
 
-  <!-- Marathon Shape tables (one per user) -->
-  <div id="marathonTablesContainer"></div>
+  <div id="tables"></div>
 
   <script src="app.js"></script>
 </body>
