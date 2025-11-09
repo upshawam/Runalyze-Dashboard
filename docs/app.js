@@ -1,9 +1,5 @@
-// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (now including Optimum parsed from marathon page)
-// Expects files:
-//   docs/data/<user>_vo2.json
-//   docs/data/<user>_marathon.json
-//   docs/data/<user>_prognosis.json
-//   docs/data/<user>_marathon_requirements.json   <-- new, parsed from Runalyze page (includes optimum_time)
+// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (with Optimum support).
+// This version adds per-user wrapper classes so CSS can shade Kristin (purple) and Aaron (green).
 
 const ERR_EL = document.getElementById('errors');
 const TABLES_EL = document.getElementById('tables');
@@ -80,7 +76,6 @@ function findLatestValue(map){
 }
 
 let vo2Chart = null;
-
 const USERS = ['kristin','aaron'];
 
 const RUNALYZE_ROWS = [
@@ -130,7 +125,7 @@ function findPrognosisEntry(entries, targetMi, tol = 0.35){
 async function loadAndRender(){
   showError('');
   try{
-    // fetch for each user: vo2, marathon(internal), prognosis, marathon_requirements (new)
+    // fetch for each user
     const allFetches = [];
     for(const u of USERS){
       allFetches.push(fetchJSON(`data/${u}_vo2.json`).catch(()=>null));
@@ -177,20 +172,20 @@ async function loadAndRender(){
       const currentPct = latest ? (latest.value * 100) : null;
       const userTitle = `<div class="user-block"><div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct !== null ? (currentPct.toFixed(1)+'%') : 'N/A'} ${latest ? '('+latest.date+')' : ''}</div></div>`;
 
-      // If we have a parsed requirements JSON, use it directly
+      // Build rows HTML
       let rowsHtml = '';
       if(req && Array.isArray(req.entries) && req.entries.length){
-        // use parsed requirements
+        // use parsed requirements JSON from Runalyze page (preferred)
         for(const r of req.entries){
           const label = r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-');
-          const required = r.required_pct !== null && r.required_pct !== undefined ? `${r.required_pct}%` : '-';
+          const required = (r.required_pct !== null && r.required_pct !== undefined) ? `${r.required_pct}%` : '-';
           const weekly = r.weekly || '-';
           const longRun = r.long_run || '-';
           const achievedNum = (r.achieved_pct !== null && r.achieved_pct !== undefined) ? `${r.achieved_pct}%` : '-';
           const iconHtml = r.achieved_ok ? `<span class="plus">✔</span>` : `<span class="minus">✖</span>`;
           const progTime = r.prognosis_time || '-';
-          // show optimum only if achieved_pct < required_pct (or achieved_pct < 100? user asked: only present if 100% shape for each distance goal has not been met)
           let optimumText = '-';
+          // show optimum only if achieved_pct < 100 (per your request)
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
@@ -206,11 +201,8 @@ async function loadAndRender(){
           </tr>`;
         }
       } else {
-        // Fallback: build from RUNALYZE_ROWS and prognosis & computed achieved using currentPct
+        // fallback: derive from default RUNALYZE_ROWS and prognosis data
         for(const r of RUNALYZE_ROWS){
-          const required = r.requiredPct || `${r.requiredPct}%`;
-          const weekly = r.weekly;
-          const longRun = r.longRun;
           let achievedText = '-';
           let achievedIcon = `<span class="minus">✖</span>`;
           if(currentPct !== null && r.requiredPct){
@@ -218,14 +210,12 @@ async function loadAndRender(){
             achievedText = `${achievedNum}%`;
             if(achievedNum >= 100) achievedIcon = `<span class="plus">✔</span>`;
           }
-          // prognosis lookup
           let progText = '-';
           if(prog){
             const entries = Array.isArray(prog.entries) ? prog.entries : (Array.isArray(prog) ? prog : (prog.entries || []));
             const match = findPrognosisEntry(entries, r.mi, 0.4);
             if(match && match.time) progText = match.time;
           }
-          // compute 'optimum' only if Achieved < 100: best-effort - use prognosis time if present else '-'
           const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
 
           rowsHtml += `<tr class="r">
@@ -242,7 +232,6 @@ async function loadAndRender(){
       }
 
       const tableHtml = `
-        ${userTitle}
         <table class="rz-table" aria-label="${u} marathon requirements">
           <thead>
             <tr>
@@ -267,11 +256,14 @@ async function loadAndRender(){
           </tbody>
         </table>
       `;
-      const div = document.createElement('div');
-      div.innerHTML = tableHtml;
-      TABLES_EL.appendChild(div);
-    }
 
+      // wrapper with per-user class so CSS can style columns by user
+      const wrapper = document.createElement('div');
+      wrapper.className = `user-table user-${u}`;
+      // add a header/title + the table
+      wrapper.innerHTML = userTitle + tableHtml;
+      TABLES_EL.appendChild(wrapper);
+    }
   }catch(err){
     showError(err.message || String(err));
     console.error(err);
