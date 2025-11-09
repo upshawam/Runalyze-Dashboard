@@ -42,7 +42,7 @@
 </head>
 <body>
   <div class="page-title">VO₂ Max & Marathon Shape (static)</div>
-  <div class="note">Displaying the last 30 days. Data is loaded from data/&lt;user&gt;_vo2.json and data/&lt;user&gt;_marathon.json.</div>
+  <div class="note">Displaying the last 30 days. Data is loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json.</div>
 
   <div id="errors" class="error" aria-live="polite"></div>
   <div id="status" class="status" aria-live="polite"></div>
@@ -60,7 +60,7 @@
 
     <canvas id="marathonChart" role="img" aria-label="Marathon shape chart"></canvas>
 
-    <!-- Prognosis table -->
+    <!-- Prognosis table: show 5k, 10k, Half, Full with time and pace -->
     <table id="prognosisTable" class="prog-table" aria-label="Prognosis predictions">
       <thead>
         <tr><th>Distance</th><th>Kristin (time / pace)</th><th>Aaron (time / pace)</th></tr>
@@ -73,14 +73,12 @@
 
 <script>
 /*
-  Minimal dynamic page:
-  - Fixed users: kristin and aaron.
-  - Loads JSON from data/<user>_vo2.json, data/<user>_marathon.json and data/<user>_prognosis.json
-  - Renders VO2 & marathon charts (last 30 days) and a Prognosis table (distance / time / pace for each user).
+  Loads JSON from data/<user>_vo2.json, data/<user>_marathon.json and data/<user>_prognosis.json,
+  renders charts and a prognosis table listing 5k, 10k, half, full with time and pace.
 */
 
 const errorsEl = document.getElementById('errors');
-const statusEl = document.getElementById('status'); // kept for accessibility but hidden visually
+const statusEl = document.getElementById('status'); // hidden visually
 const marPctEl = document.getElementById('marathonPct');
 const progTbody = document.querySelector('#prognosisTable tbody');
 
@@ -232,7 +230,7 @@ async function loadAndRender(){
     vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Opts, vo2Chart);
     marathonChart = createOrUpdateChart(marCtx, marData, marOpts, marathonChart);
 
-    // Render prognosis table
+    // Render prognosis table but only for the standard target distances (5k, 10k, half, full)
     renderPrognosisTable(progAjson, progBjson);
 
     // Clear any error text
@@ -244,45 +242,61 @@ async function loadAndRender(){
   }
 }
 
+/*
+  Render prognosis table specifically for these targets:
+    5k  -> ~3.11 mi
+    10k -> ~6.21 mi
+    Half Marathon -> ~13.11 mi
+    Marathon -> ~26.22 mi
+
+  We'll match by distance_mi if present (tolerance), otherwise fall back to distance_label string search.
+*/
 function renderPrognosisTable(progA, progB){
-  // progA/progB are arrays of entries or null
-  const aEntries = Array.isArray(progA) ? progA : [];
-  const bEntries = Array.isArray(progB) ? progB : [];
+  const aEntries = Array.isArray(progA && progA.entries ? progA.entries : progA) ? (progA.entries || progA) : [];
+  const bEntries = Array.isArray(progB && progB.entries ? progB.entries : progB) ? (progB.entries || progB) : [];
 
-  // Build a union of distance_label keys (use label if present, else distance_mi)
-  const keys = new Map();
-  aEntries.forEach(e => {
-    const key = e.distance_label || String(e.distance_mi) + ' mi';
-    keys.set(key, key);
-  });
-  bEntries.forEach(e => {
-    const key = e.distance_label || String(e.distance_mi) + ' mi';
-    keys.set(key, key);
-  });
+  const targets = [
+    { id: '5k', mi: 3.11, label: '5k' },
+    { id: '10k', mi: 6.21, label: '10k' },
+    { id: 'half', mi: 13.11, label: 'Half' },
+    { id: 'full', mi: 26.22, label: 'Full' }
+  ];
 
-  // If no prognosis found, show a friendly message
-  if(keys.size === 0){
-    progTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#666">No prognosis data available (run workflow or fetch manually).</td></tr>';
-    return;
+  // helper to find best match in an entries array for a target
+  function findMatch(entries, target){
+    if(!Array.isArray(entries)) return null;
+    // try numeric match by distance_mi within tolerance (0.25 mi)
+    const tol = 0.35;
+    let best = null;
+    for(const e of entries){
+      if(e && typeof e.distance_mi === 'number'){
+        const diff = Math.abs(e.distance_mi - target.mi);
+        if(diff <= tol){
+          if(!best || diff < Math.abs(best.distance_mi - target.mi)) best = e;
+        }
+      }
+    }
+    if(best) return best;
+    // fallback: try to find by label substring (e.g., '5', '10', '13', '26' or 'mi')
+    const look = String(target.mi).split('.')[0]; // '3','6','13','26'
+    for(const e of entries){
+      if(!e) continue;
+      const lbl = (e.distance_label || '').toLowerCase().replace(/\u00a0/g,' ');
+      if(lbl.includes(String(target.mi)) || lbl.includes(look) || lbl.includes(target.id) ) return e;
+    }
+    // nothing found
+    return null;
   }
 
-  // Sort keys by numeric distance when possible
-  const sortedKeys = Array.from(keys.keys()).sort((A,B)=>{
-    const numA = parseFloat(A.replace(',', '.').replace(/[^\d\.]/g,'')) || 0;
-    const numB = parseFloat(B.replace(',', '.').replace(/[^\d\.]/g,'')) || 0;
-    return numA - numB;
-  });
-
-  // map distance_label -> entry
-  const amap = new Map(aEntries.map(e => [(e.distance_label || String(e.distance_mi) + ' mi'), e]));
-  const bmap = new Map(bEntries.map(e => [(e.distance_label || String(e.distance_mi) + ' mi'), e]));
-
-  const rows = sortedKeys.map(k => {
-    const a = amap.get(k);
-    const b = bmap.get(k);
-    const aText = a ? `${a.time || '-'}  (${a.pace || '-'})` : '-';
-    const bText = b ? `${b.time || '-'}  (${b.pace || '-'})` : '-';
-    return `<tr><td>${k}</td><td>${aText}</td><td>${bText}</td></tr>`;
+  // build rows for each target
+  const rows = targets.map(t => {
+    const a = findMatch(aEntries, t);
+    const b = findMatch(bEntries, t);
+    const aText = a ? `${a.time || '-'} / ${a.pace || '-'}` : '-';
+    const bText = b ? `${b.time || '-'} / ${b.pace || '-'}` : '-';
+    // friendly label
+    const friendly = (t.id === 'half') ? 'Half (13.1 mi)' : (t.id === 'full' ? 'Marathon (26.2 mi)' : t.id.toUpperCase());
+    return `<tr><td>${friendly}</td><td>${aText}</td><td>${bText}</td></tr>`;
   });
 
   progTbody.innerHTML = rows.join('\n');
