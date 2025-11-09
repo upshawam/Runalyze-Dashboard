@@ -85,13 +85,44 @@
     function trendToPoints(trendObj) {
       if (!trendObj) return [];
       const obj = trendObj.data || trendObj.trend || trendObj;
-      try {
-        const entries = Object.entries(obj).map(([d, v]) => ({ x: d, y: v }));
-        entries.sort((a,b) => a.x.localeCompare(b.x));
-        return entries;
-      } catch (e) {
-        return [];
-      }
+
+      const entries = Object.entries(obj).map(([k, v]) => {
+        // Normalize x
+        let x;
+        if (/^\d+$/.test(k)) {
+          let n = Number(k);
+          if (n < 1e12) n = n * 1000; // seconds -> ms
+          x = n;
+        } else {
+          x = k;
+        }
+
+        // Normalize y
+        let y = null;
+        if (typeof v === 'number') {
+          y = v;
+        } else if (v && typeof v === 'object') {
+          if (typeof v.value === 'number') y = v.value;
+          else if (typeof v.y === 'number') y = v.y;
+          else if (Array.isArray(v) && typeof v[0] === 'number') y = v[0];
+          else {
+            const num = Object.values(v).find(a => typeof a === 'number');
+            if (typeof num === 'number') y = num;
+          }
+        }
+
+        return { x, y };
+      }).filter(pt => pt.y !== null);
+
+      entries.sort((a, b) => {
+        const ax = typeof a.x === 'number' ? a.x : String(a.x);
+        const bx = typeof b.x === 'number' ? b.x : String(b.x);
+        if (ax < bx) return -1;
+        if (ax > bx) return 1;
+        return 0;
+      });
+
+      return entries;
     }
 
     function showStatus(text) { statusEl.textContent = text; }
@@ -109,7 +140,6 @@
       const a = document.getElementById('userA').value.trim() || 'kristin';
       const b = document.getElementById('userB').value.trim() || 'aaron';
 
-      // For Pages served from docs/, the site root maps to docs/, so JSON files are available at data/...
       const mAPath = `data/${a}_marathon.json`;
       const mBPath = `data/${b}_marathon.json`;
       const vAPath = `data/${a}_vo2.json`;
