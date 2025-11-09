@@ -1,5 +1,4 @@
-// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user
-// Minor adjustments so generated table markup aligns with the Runalyze CSS above.
+// app.js - compact table adjustments + ensure 100% marathon row has top+bottom divider
 
 const ERR_EL = document.getElementById('errors') || { textContent: '' };
 const TABLES_EL = document.getElementById('tables');
@@ -201,7 +200,7 @@ async function loadAndRender(){
         else if(prog.meta && prog.meta.last_updated) lastUpdated = prog.meta.last_updated;
       }
 
-      const lastUpdatedText = lastUpdated ? `<div class="small">Last updated: ${formatTimestamp(lastUpdated)}</div>` : '';
+      const lastUpdatedText = lastUpdated ? `<div class="user-meta">Last updated: ${formatTimestamp(lastUpdated)}</div>` : '';
 
       const userHeader = `
         <div class="user-block user-${u}">
@@ -229,7 +228,8 @@ async function loadAndRender(){
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
-          const special = (r.required_pct === 100) ? ' top-separated bottom-separated' : '';
+          // ensure 100% marathon row gets both top and bottom separators
+          const special = (typeof r.required_pct === 'number' && r.required_pct === 100) ? ' top-separated bottom-separated' : '';
           rowsHtml += `<tr class="r${special}">
             <td class="nowrap-mi">${label}</td>
             <td>${required}</td>
@@ -258,7 +258,9 @@ async function loadAndRender(){
             if(match && match.time) progText = match.time;
           }
           const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
-          rowsHtml += `<tr class="r">
+          // ensure fallback 100% row also gets separators if present in RUNALYZE_ROWS
+          const special = (typeof r.requiredPct === 'number' && r.requiredPct === 100) ? ' top-separated bottom-separated' : '';
+          rowsHtml += `<tr class="r${special}">
             <td class="nowrap-mi">${label}</td>
             <td>${r.requiredPct}%</td>
             <td>${r.weekly}</td>
