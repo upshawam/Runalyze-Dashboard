@@ -1,12 +1,17 @@
-// app.js - renders VO2 charts and replaces the Marathon shape graph with Runalyze-style tables per user.
-// Expects files: data/<user>_vo2.json, data/<user>_marathon.json, data/<user>_prognosis.json
+// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (now including Optimum parsed from marathon page)
+// Expects files:
+//   docs/data/<user>_vo2.json
+//   docs/data/<user>_marathon.json
+//   docs/data/<user>_prognosis.json
+//   docs/data/<user>_marathon_requirements.json   <-- new, parsed from Runalyze page (includes optimum_time)
 
-const errorsEl = document.getElementById('errors');
-const statusEl = document.getElementById('status');
-const marathonTablesContainer = document.getElementById('marathonTablesContainer');
+const ERR_EL = document.getElementById('errors');
+const TABLES_EL = document.getElementById('tables');
 
-function showError(msg){ errorsEl.textContent = msg || ''; if(msg) console.error(msg); }
-function showStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
+function showError(msg){
+  ERR_EL.textContent = msg || '';
+  if(msg) console.error(msg);
+}
 
 async function fetchJSON(path){
   try{
@@ -18,7 +23,6 @@ async function fetchJSON(path){
   }
 }
 
-// utilities for dates / maps
 function isoToDateKey(iso){
   const d = new Date(iso);
   if(Number.isNaN(d.getTime())) return null;
@@ -27,7 +31,6 @@ function isoToDateKey(iso){
   const day = String(d.getUTCDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
-
 function getLastNDates(n){
   const out = [];
   const now = new Date();
@@ -76,7 +79,21 @@ function findLatestValue(map){
   return null;
 }
 
-// simple Chart creation/update
+let vo2Chart = null;
+
+const USERS = ['kristin','aaron'];
+
+const RUNALYZE_ROWS = [
+  { mi: 3.1, label: '3,1 mi', requiredPct: 7, weekly: 'ca. 5 mi', longRun: '-' },
+  { mi: 6.2, label: '6,2 mi', requiredPct: 17, weekly: 'ca. 11 mi', longRun: '-' },
+  { mi: 10.0, label: '10,0 mi', requiredPct: 31, weekly: 'ca. 19 mi', longRun: '-' },
+  { mi: 13.1, label: '13,1 mi', requiredPct: 43, weekly: 'ca. 25 mi', longRun: 'ca. 11 mi' },
+  { mi: 26.2, label: '26,2 mi', requiredPct: 100, weekly: 'ca. 44 mi', longRun: 'ca. 18 mi' },
+  { mi: 31.1, label: '31,1 mi', requiredPct: 123, weekly: 'ca. 47 mi', longRun: 'ca. 20 mi' },
+  { mi: 62.1, label: '62,1 mi', requiredPct: 288, weekly: 'ca. 64 mi', longRun: 'ca. 31 mi' },
+  { mi: 100.0, label: '100,0 mi', requiredPct: 518, weekly: 'ca. 114 mi', longRun: 'ca. 39 mi' }
+];
+
 function createOrUpdateChart(ctx, data, options, existing){
   if(existing){
     existing.data = data;
@@ -88,7 +105,6 @@ function createOrUpdateChart(ctx, data, options, existing){
   return new Chart(ctx, { type:'line', data, options });
 }
 
-// Helper to match prognosis entries to target distances
 function findPrognosisEntry(entries, targetMi, tol = 0.35){
   if(!Array.isArray(entries)) return null;
   let best = null;
@@ -102,7 +118,6 @@ function findPrognosisEntry(entries, targetMi, tol = 0.35){
     }
   }
   if(best) return best;
-  // fallback: match by label substring
   const look = String(targetMi).split('.')[0];
   for(const e of entries){
     if(!e) continue;
@@ -112,54 +127,36 @@ function findPrognosisEntry(entries, targetMi, tol = 0.35){
   return null;
 }
 
-// Table model (copied from the Runalyze snippet you provided)
-const RUNALYZE_ROWS = [
-  { mi: 3.1, label: '3,1 mi', requiredPct: 7, weekly: 'ca. 5 mi', longRun: '-' },
-  { mi: 6.2, label: '6,2 mi', requiredPct: 17, weekly: 'ca. 11 mi', longRun: '-' },
-  { mi: 10.0, label: '10,0 mi', requiredPct: 31, weekly: 'ca. 19 mi', longRun: '-' },
-  { mi: 13.1, label: '13,1 mi', requiredPct: 43, weekly: 'ca. 25 mi', longRun: 'ca. 11 mi' },
-  { mi: 26.2, label: '26,2 mi', requiredPct: 100, weekly: 'ca. 44 mi', longRun: 'ca. 18 mi' },
-  { mi: 31.1, label: '31,1 mi', requiredPct: 123, weekly: 'ca. 47 mi', longRun: 'ca. 20 mi' },
-  { mi: 62.1, label: '62,1 mi', requiredPct: 288, weekly: 'ca. 64 mi', longRun: 'ca. 31 mi' },
-  { mi: 100.0, label: '100,0 mi', requiredPct: 518, weekly: 'ca. 114 mi', longRun: 'ca. 39 mi' }
-];
-
-// users to show tables for
-const USERS = ['kristin','aaron'];
-
-let vo2Chart = null;
-
 async function loadAndRender(){
   showError('');
-  showStatus('Loading…');
-
   try{
-    // fetch all data
-    const fetches = [];
+    // fetch for each user: vo2, marathon(internal), prognosis, marathon_requirements (new)
+    const allFetches = [];
     for(const u of USERS){
-      fetches.push(fetchJSON(`data/${u}_vo2.json`).catch(e=>{ showError(e.message); return null; }));
-      fetches.push(fetchJSON(`data/${u}_marathon.json`).catch(e=>{ showError(e.message); return null; }));
-      fetches.push(fetchJSON(`data/${u}_prognosis.json`).catch(()=> null));
+      allFetches.push(fetchJSON(`data/${u}_vo2.json`).catch(()=>null));
+      allFetches.push(fetchJSON(`data/${u}_marathon.json`).catch(()=>null));
+      allFetches.push(fetchJSON(`data/${u}_prognosis.json`).catch(()=>null));
+      allFetches.push(fetchJSON(`data/${u}_marathon_requirements.json`).catch(()=>null));
     }
-    const results = await Promise.all(fetches);
+    const results = await Promise.all(allFetches);
 
-    // split back into objects per user
     const usersData = {};
     for(let i=0;i<USERS.length;i++){
       const u = USERS[i];
       usersData[u] = {
-        vo2: results[i*3 + 0],
-        marathon: results[i*3 + 1],
-        prognosis: results[i*3 + 2]
+        vo2: results[i*4 + 0],
+        marathon: results[i*4 + 1],
+        prognosis: results[i*4 + 2],
+        requirements: results[i*4 + 3]
       };
     }
 
-    // Render VO2 chart (shared across users)
+    // VO2 chart
     const last30 = getLastNDates(30);
     const vo2Datasets = [];
     for(const u of USERS){
-      const uMap = vo2ToMap(usersData[u].vo2);
-      const ser = buildSeries(uMap, last30);
+      const map = vo2ToMap(usersData[u].vo2);
+      const ser = buildSeries(map, last30);
       const label = u.charAt(0).toUpperCase() + u.slice(1) + ' VO₂';
       const color = u === USERS[0] ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
       vo2Datasets.push({ label, data: ser, borderColor: color, backgroundColor: color.replace('1)', '0.12)'), tension:0.25, pointRadius:3, spanGaps:true });
@@ -169,56 +166,80 @@ async function loadAndRender(){
     const vo2Ctx = document.getElementById('vo2Chart').getContext('2d');
     vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Opts, vo2Chart);
 
-    // Build and render the Runalyze-style tables — one per user
-    marathonTablesContainer.innerHTML = ''; // clear
+    // Build tables per user
+    TABLES_EL.innerHTML = '';
     for(const u of USERS){
       const data = usersData[u];
       const marMap = marathonToMap(data.marathon);
       const prog = data.prognosis;
+      const req = data.requirements;
       const latest = findLatestValue(marMap);
-      const currentPct = latest ? (latest.value * 100) : null; // e.g. 65.12
-
-      // table header per user
+      const currentPct = latest ? (latest.value * 100) : null;
       const userTitle = `<div class="user-block"><div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct !== null ? (currentPct.toFixed(1)+'%') : 'N/A'} ${latest ? '('+latest.date+')' : ''}</div></div>`;
 
-      // build rows
-      const rows = RUNALYZE_ROWS.map(r => {
-        const required = r.requiredPct;
-        const weekly = r.weekly;
-        const longRun = r.longRun;
-        // Achieved percent = currentPct / requiredPct * 100
-        let achievedText = '-';
-        let achievedNum = null;
-        let achievedIcon = '';
-        if(currentPct !== null && required){
-          achievedNum = Math.round((currentPct / required) * 100); // e.g. 890
-          achievedText = `${achievedNum}%`;
-          achievedIcon = (achievedNum >= 100) ? `<span class="plus">✔</span>` : `<span class="minus">✖</span>`;
+      // If we have a parsed requirements JSON, use it directly
+      let rowsHtml = '';
+      if(req && Array.isArray(req.entries) && req.entries.length){
+        // use parsed requirements
+        for(const r of req.entries){
+          const label = r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-');
+          const required = r.required_pct !== null && r.required_pct !== undefined ? `${r.required_pct}%` : '-';
+          const weekly = r.weekly || '-';
+          const longRun = r.long_run || '-';
+          const achievedNum = (r.achieved_pct !== null && r.achieved_pct !== undefined) ? `${r.achieved_pct}%` : '-';
+          const iconHtml = r.achieved_ok ? `<span class="plus">✔</span>` : `<span class="minus">✖</span>`;
+          const progTime = r.prognosis_time || '-';
+          // show optimum only if achieved_pct < required_pct (or achieved_pct < 100? user asked: only present if 100% shape for each distance goal has not been met)
+          let optimumText = '-';
+          if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
+            optimumText = r.optimum_time;
+          }
+          rowsHtml += `<tr class="r">
+            <td class="b right-separated">${label}</td>
+            <td>${required}</td>
+            <td>${weekly}</td>
+            <td class="right-separated">${longRun}</td>
+            <td>${achievedNum}</td>
+            <td>${iconHtml}</td>
+            <td class="left-separated small hidden-mobile">${progTime}</td>
+            <td class="hidden-mobile">${optimumText}</td>
+          </tr>`;
         }
+      } else {
+        // Fallback: build from RUNALYZE_ROWS and prognosis & computed achieved using currentPct
+        for(const r of RUNALYZE_ROWS){
+          const required = r.requiredPct || `${r.requiredPct}%`;
+          const weekly = r.weekly;
+          const longRun = r.longRun;
+          let achievedText = '-';
+          let achievedIcon = `<span class="minus">✖</span>`;
+          if(currentPct !== null && r.requiredPct){
+            const achievedNum = Math.round((currentPct / r.requiredPct) * 100);
+            achievedText = `${achievedNum}%`;
+            if(achievedNum >= 100) achievedIcon = `<span class="plus">✔</span>`;
+          }
+          // prognosis lookup
+          let progText = '-';
+          if(prog){
+            const entries = Array.isArray(prog.entries) ? prog.entries : (Array.isArray(prog) ? prog : (prog.entries || []));
+            const match = findPrognosisEntry(entries, r.mi, 0.4);
+            if(match && match.time) progText = match.time;
+          }
+          // compute 'optimum' only if Achieved < 100: best-effort - use prognosis time if present else '-'
+          const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
 
-        // find prognosis entry for this target
-        let progText = '-';
-        if (prog){
-          // prognosis JSON may be shape { meta: ..., entries: [...] } or array
-          const entries = Array.isArray(prog.entries) ? prog.entries : (Array.isArray(prog) ? prog : (prog.entries || []));
-          const match = findPrognosisEntry(entries, r.mi, 0.4);
-          if(match && match.time) progText = match.time;
+          rowsHtml += `<tr class="r">
+            <td class="b right-separated">${r.label}</td>
+            <td>${r.requiredPct}%</td>
+            <td>${r.weekly}</td>
+            <td class="right-separated">${r.longRun}</td>
+            <td>${achievedText}</td>
+            <td>${achievedIcon}</td>
+            <td class="left-separated small hidden-mobile">${progText}</td>
+            <td class="hidden-mobile">${optimumText}</td>
+          </tr>`;
         }
-
-        // Optimum column we don't have reliably; leave '-' unless present in prognosis as 'optimum' (not present in current feed)
-        const optimumText = '-';
-
-        return `<tr class="r">
-          <td class="b right-separated">${r.label}</td>
-          <td>${required}%</td>
-          <td>${weekly}</td>
-          <td class="right-separated">${longRun}</td>
-          <td>${achievedText}</td>
-          <td>${achievedIcon}</td>
-          <td class="left-separated small hidden-mobile">${progText}</td>
-          <td class="hidden-mobile">${optimumText}</td>
-        </tr>`;
-      });
+      }
 
       const tableHtml = `
         ${userTitle}
@@ -242,21 +263,17 @@ async function loadAndRender(){
             </tr>
           </thead>
           <tbody>
-            ${rows.join('\n')}
+            ${rowsHtml}
           </tbody>
         </table>
       `;
-
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = tableHtml;
-      marathonTablesContainer.appendChild(wrapper);
+      const div = document.createElement('div');
+      div.innerHTML = tableHtml;
+      TABLES_EL.appendChild(div);
     }
 
-    showError('');
-    showStatus('');
   }catch(err){
-    showError(err.message);
-    showStatus('');
+    showError(err.message || String(err));
     console.error(err);
   }
 }
