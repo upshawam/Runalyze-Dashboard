@@ -29,51 +29,23 @@ jobs:
           pip install playwright
           playwright install --with-deps
 
-      - name: Prepare storage files from secrets (safe: base64 or raw)
+      - name: Prepare storage files from secrets
         env:
           STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
           STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
         run: |
-          set -euo pipefail
           mkdir -p tmp
-
-          if [ -n "${STORAGE_KRISTIN:-}" ]; then
-            printf '%s' "$STORAGE_KRISTIN" > tmp/_raw_kristin.txt
-            if printf '%s' "$(cat tmp/_raw_kristin.txt)" | base64 --decode > tmp/storage_kristin.json 2>/dev/null; then
-              # If decode produced something invalid we'll detect below
-              echo "kristin: attempted base64 decode -> tmp/storage_kristin.json"
-            else
-              echo "kristin: not base64, writing raw JSON -> tmp/storage_kristin.json"
-              cp tmp/_raw_kristin.txt tmp/storage_kristin.json
-            fi
-            python -c "import json,sys
-try:
-  json.load(open('tmp/storage_kristin.json','r',encoding='utf-8'))
-  print('kristin storage: valid JSON')
-except Exception as e:
-  print('kristin storage: INVALID JSON ->', e); sys.exit(2)
-"
+          if [ -n "$STORAGE_KRISTIN" ]; then
+            echo "Writing storage_kristin.json"
+            echo "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json
           else
-            echo "STORAGE_KRISTIN not set; skipping kristin"
+            echo "STORAGE_KRISTIN secret not set"
           fi
-
-          if [ -n "${STORAGE_AARON:-}" ]; then
-            printf '%s' "$STORAGE_AARON" > tmp/_raw_aaron.txt
-            if printf '%s' "$(cat tmp/_raw_aaron.txt)" | base64 --decode > tmp/storage_aaron.json 2>/dev/null; then
-              echo "aaron: attempted base64 decode -> tmp/storage_aaron.json"
-            else
-              echo "aaron: not base64, writing raw JSON -> tmp/storage_aaron.json"
-              cp tmp/_raw_aaron.txt tmp/storage_aaron.json
-            fi
-            python -c "import json,sys
-try:
-  json.load(open('tmp/storage_aaron.json','r',encoding='utf-8'))
-  print('aaron storage: valid JSON')
-except Exception as e:
-  print('aaron storage: INVALID JSON ->', e); sys.exit(2)
-"
+          if [ -n "$STORAGE_AARON" ]; then
+            echo "Writing storage_aaron.json"
+            echo "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json
           else
-            echo "STORAGE_AARON not set; skipping aaron"
+            echo "STORAGE_AARON secret not set"
           fi
 
       - name: Run fetch script for each account
@@ -81,29 +53,19 @@ except Exception as e:
           PYTHONUNBUFFERED: 1
         run: |
           mkdir -p docs/data
-          if [ -f tmp/storage_kristin.json ]; then
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
-          else
-            echo "No tmp/storage_kristin.json; skipped kristin"
-          fi
-          if [ -f tmp/storage_aaron.json ]; then
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json --user aaron --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
-          else
-            echo "No tmp/storage_aaron.json; skipped aaron"
-          fi
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
           ls -la docs/data || true
 
       - name: Commit and push updated docs (use PAT)
         env:
           GIT_COMMITTER_NAME: "github-actions[bot]"
           GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
-          ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
         run: |
           git config user.name "${GIT_COMMITTER_NAME}"
           git config user.email "${GIT_COMMITTER_EMAIL}"
+          # use PAT stored in ACTIONS_PAT secret for authenticated push
+          git remote set-url origin https://x-access-token:${{ secrets.ACTIONS_PAT }}@github.com/${{ github.repository }}.git
           git add docs/data || true
           git commit -m "ci: update runalyze data (automated)" || echo "No changes to commit"
-          if [ -n "${ACTIONS_PAT:-}" ]; then
-            git remote set-url origin https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}.git
-          fi
           git push origin HEAD:main
