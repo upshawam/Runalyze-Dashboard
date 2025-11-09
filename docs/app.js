@@ -1,6 +1,5 @@
 // app.js - VO2 chart + Runalyze-style Marathon Shape tables per user
-// Minor visual changes: use Font Awesome icons to match Runalyze table and tighten spacing.
-// Display _meta.last_updated from marathon JSON (if present).
+// Minor adjustments so generated table markup aligns with the Runalyze CSS above.
 
 const ERR_EL = document.getElementById('errors') || { textContent: '' };
 const TABLES_EL = document.getElementById('tables');
@@ -133,11 +132,9 @@ function formatTimestamp(ts){
     return ts;
   }
 }
-
-/* helper to ensure "3,1 mi" becomes "3,1&nbsp;mi" for non-breaking */
 function nbspMi(text){
   if(!text || typeof text !== 'string') return text;
-  return text.replace(/(\d[\d,\.]*)\s*mi/gi, '$1&nbsp;mi');
+  return text.replace(/(\d[\d,\.]*)\s*mi/gi, '$1\u00a0mi');
 }
 
 async function loadAndRender(){
@@ -189,7 +186,7 @@ async function loadAndRender(){
       const latest = findLatestValue(marMap);
       const currentPct = latest ? (latest.value * 100) : null;
 
-      // show last-updated: prefer marathon JSON _meta, then requirements, then prognosis
+      // last-updated: prefer marathon JSON _meta, then requirements, then prognosis
       let lastUpdated = null;
       if(data.marathon && typeof data.marathon === 'object'){
         if(data.marathon._meta && data.marathon._meta.last_updated) lastUpdated = data.marathon._meta.last_updated;
@@ -219,7 +216,6 @@ async function loadAndRender(){
       // Build rows HTML
       let rowsHtml = '';
       if(req && Array.isArray(req.entries) && req.entries.length){
-        // use parsed requirements JSON from Runalyze page (preferred)
         for(const r of req.entries){
           let label = r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-');
           label = nbspMi(label);
@@ -233,21 +229,19 @@ async function loadAndRender(){
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
-          rowsHtml += `<tr class="r ${r.required_pct === 100 ? 'top-separated bottom-separated' : ''}">
-            <td class="b right-separated nowrap-mi">${label}</td>
+          const special = (r.required_pct === 100) ? ' top-separated bottom-separated' : '';
+          rowsHtml += `<tr class="r${special}">
+            <td class="nowrap-mi">${label}</td>
             <td>${required}</td>
             <td>${weekly}</td>
-            <td class="right-separated">${longRun}</td>
-            <td>
-              ${achievedNum}
-            </td>
-            <td>${iconHtml}</td>
+            <td>${longRun}</td>
+            <td class="center">${achievedNum}</td>
+            <td class="center">${iconHtml}</td>
             <td class="left-separated hidden-mobile">${progTime}</td>
             <td class="hidden-mobile">${optimumText}</td>
           </tr>`;
         }
       } else {
-        // fallback: derive from default RUNALYZE_ROWS and prognosis data
         for(const r of RUNALYZE_ROWS){
           const label = nbspMi(r.label);
           let achievedText = '-';
@@ -264,14 +258,13 @@ async function loadAndRender(){
             if(match && match.time) progText = match.time;
           }
           const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
-
           rowsHtml += `<tr class="r">
-            <td class="b right-separated nowrap-mi">${label}</td>
+            <td class="nowrap-mi">${label}</td>
             <td>${r.requiredPct}%</td>
             <td>${r.weekly}</td>
-            <td class="right-separated">${r.longRun}</td>
-            <td>${achievedText}</td>
-            <td>${achievedIcon}</td>
+            <td>${r.longRun}</td>
+            <td class="center">${achievedText}</td>
+            <td class="center">${achievedIcon}</td>
             <td class="left-separated hidden-mobile">${progText}</td>
             <td class="hidden-mobile">${optimumText}</td>
           </tr>`;
@@ -281,20 +274,20 @@ async function loadAndRender(){
       const tableHtml = `
         <table class="rz-table" aria-label="${u} marathon requirements">
           <thead>
-            <tr>
-              <th class="right-separated"></th>
-              <th colspan="3" class="right-separated">Required</th>
+            <tr class="group-row">
+              <th></th>
+              <th colspan="3">Required</th>
               <th colspan="2"></th>
-              <th class="left-separated hidden-mobile">Prognosis</th>
-              <th class="hidden-mobile">Optimum</th>
+              <th colspan="2" class="hidden-mobile"></th>
             </tr>
-            <tr>
-              <th class="right-separated">Distance</th>
+            <tr class="label-row">
+              <th>Distance</th>
               <th>Marathon Shape</th>
               <th>Weekly mileage</th>
-              <th class="right-separated">Long Run</th>
-              <th colspan="2">Achieved</th>
-              <th class="left-separated hidden-mobile">Prognosis</th>
+              <th>Long Run</th>
+              <th>Achieved</th>
+              <th></th>
+              <th class="hidden-mobile">Prognosis</th>
               <th class="hidden-mobile">Optimum</th>
             </tr>
           </thead>
