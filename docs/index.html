@@ -1,45 +1,329 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Runalyze Dashboard</title>
+  <title>VO₂ Max & Marathon Shape Comparison</title>
 
   <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Luxon + Chart.js Luxon adapter (date adapter for Chart.js time scales) -->
-  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 24px; }
-    #controls { margin-bottom: 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .chart-wrap { max-width: 1000px; margin-bottom: 28px; width:100%; }
-    canvas { width:100%; display:block; }
-    .note { color: #666; font-size: 0.9rem; margin-bottom:8px; }
-    .error { color: #b00; font-weight: 600; margin-top:6px; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      margin: 24px;
+      background: #fafafa;
+      color: #111;
+    }
+
+    header { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    label { font-weight:600; }
+    input { padding:6px 8px; margin-left:6px; }
+
+    .controls { display:flex; gap:12px; align-items:center; }
+    .note { color:#666; font-size:0.95rem; margin-bottom:10px; }
+
+    .chart-wrap { max-width:1200px; margin:28px auto; }
+    canvas { width:100% !important; height:380px !important; display:block; background: #fff; border-radius:6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+
+    .status { margin-top:8px; color:#333; font-weight:600; }
+    .error { color:#b00; font-weight:700; margin-top:8px; }
+
+    @media (max-width:700px) {
+      canvas { height:300px !important; }
+    }
   </style>
 </head>
 <body>
-  <h1>Runalyze Dashboard (static)</h1>
+  <header>
+    <div>
+      <div style="font-size:1.25rem;font-weight:700">Runalyze — VO₂ & Marathon Shape</div>
+      <div class="note">Data is loaded from docs/data/&lt;user&gt;_vo2.json and docs/data/&lt;user&gt;_marathon.json (published by the workflow).</div>
+    </div>
 
-  <div class="note">If charts are empty, confirm JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
+    <div class="controls" style="margin-left:auto">
+      <label>User A: <input id="userA" value="kristin" /></label>
+      <label>User B: <input id="userB" value="aaron" /></label>
+      <button id="reload">Reload</button>
+    </div>
+  </header>
 
-  <div id="controls">
-    <label>User A: <input id="userA" value="kristin" /></label>
-    <label>User B: <input id="userB" value="aaron" /></label>
-    <button id="refreshBtn">Reload data</button>
-    <span id="status" style="margin-left:12px;color:#666"></span>
-  </div>
+  <div id="summary" class="status"></div>
+  <div id="errors" class="error" aria-live="polite"></div>
 
-  <h2>Marathon shape</h2>
-  <div class="chart-wrap"><canvas id="chartMarathon" height="240"></canvas></div>
+  <section class="chart-wrap">
+    <h2 style="margin-bottom:8px">VO₂ Max Trend (last 30 days)</h2>
+    <canvas id="vo2Chart"></canvas>
+  </section>
 
-  <h2>VO2max (trend)</h2>
-  <div class="chart-wrap"><canvas id="chartVo2" height="240"></canvas></div>
+  <section class="chart-wrap">
+    <h2 style="margin-bottom:8px">Marathon Shape (last 30 days)</h2>
+    <canvas id="marathonChart"></canvas>
+  </section>
 
-  <div id="errors" style="margin-top:12px;"></div>
+<script>
+/*
+  This page loads JSON from data/<user>_vo2.json and data/<user>_marathon.json,
+  then renders two simple comparison charts (VO2 trend and Marathon shape).
+  - No Chart.js date adapter required: x axis uses "category" with YYYY-MM-DD labels.
+  - Shows last 30 days by default.
+*/
 
-  <script src="app.js"></script>
+const summaryEl = document.getElementById('summary');
+const errorsEl = document.getElementById('errors');
+const reloadBtn = document.getElementById('reload');
+
+function showError(text){
+  errorsEl.textContent = text || '';
+  if(text) console.error(text);
+}
+
+function showSummary(text){
+  summaryEl.textContent = text || '';
+}
+
+async function fetchJSON(path){
+  try{
+    const res = await fetch(path + '?t=' + Date.now());
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return await res.json();
+  }catch(e){
+    throw new Error(`Fetch ${path} failed: ${e.message}`);
+  }
+}
+
+function isoToDateKey(iso){
+  // convert ISO timestamp to YYYY-MM-DD in local-agnostic (UTC) form
+  try{
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth()+1).padStart(2,'0');
+    const day = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }catch(e){ return null; }
+}
+
+function dateKeyToDate(key){
+  // key 'YYYY-MM-DD' -> Date object at midnight UTC
+  const [y,m,d] = key.split('-').map(Number);
+  return new Date(Date.UTC(y,m-1,d));
+}
+
+function formatPct(v){
+  if (v === null || v === undefined) return '-';
+  return (v*100).toFixed(1) + '%';
+}
+
+function getLastNDates(n){
+  const arr = [];
+  const end = new Date(); // local now
+  // Use UTC date strings (YYYY-MM-DD). We'll compute by day offsets in UTC.
+  for(let i = n-1; i >= 0; i--){
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+    arr.push(key);
+  }
+  return arr;
+}
+
+// Convert various vo2 payload shapes into map of YYYY-MM-DD -> numeric
+function vo2ToMap(vo2json){
+  if(!vo2json) return {};
+  // prefer .trend if present
+  if(vo2json.trend && typeof vo2json.trend === 'object'){
+    return vo2json.trend;
+  }
+  // fallback: "values" array of [iso, value]
+  if(Array.isArray(vo2json.values)){
+    const map = {};
+    for(const item of vo2json.values){
+      if(!item || !item[0]) continue;
+      const k = isoToDateKey(item[0]);
+      if(!k) continue;
+      map[k] = item[1];
+    }
+    return map;
+  }
+  // if already plain map
+  if(typeof vo2json === 'object'){
+    return vo2json;
+  }
+  return {};
+}
+
+// Marathon data is a simple map YYYY-MM-DD => number (as produced by the workflow)
+function marathonToMap(mjson){
+  if(!mjson) return {};
+  if(typeof mjson === 'object') return mjson;
+  return {};
+}
+
+// build series values for the given date labels. missing => null
+function buildSeries(map, labels){
+  return labels.map(d => {
+    const v = map[d];
+    return (v === null || v === undefined) ? null : Number(v);
+  });
+}
+
+// find latest non-null (search from right)
+function findLatestValue(map){
+  const keys = Object.keys(map).sort();
+  for(let i = keys.length - 1; i >= 0; i--){
+    const k = keys[i];
+    const v = map[k];
+    if (v !== null && v !== undefined && !Number.isNaN(Number(v))) {
+      return { date: k, value: Number(v) };
+    }
+  }
+  return null;
+}
+
+/* Chart instances */
+let vo2Chart = null;
+let marathonChart = null;
+
+function createOrUpdateChart(ctx, data, options, existing){
+  if(existing){
+    existing.data = data;
+    // make sure chart area is recalculated
+    existing.resize();
+    existing.update();
+    return existing;
+  } else {
+    return new Chart(ctx, { type:'line', data, options });
+  }
+}
+
+async function loadAndRender(){
+  errorsEl.textContent = '';
+  showSummary('Loading data…');
+  const userA = (document.getElementById('userA').value || 'kristin').trim();
+  const userB = (document.getElementById('userB').value || 'aaron').trim();
+
+  try{
+    const [vo2Ajson, vo2Bjson, marAjson, marBjson] = await Promise.all([
+      fetchJSON(`data/${userA}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
+      fetchJSON(`data/${userB}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
+      fetchJSON(`data/${userA}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
+      fetchJSON(`data/${userB}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
+    ]);
+
+    // Convert to maps
+    const vo2Amap = vo2ToMap(vo2Ajson);
+    const vo2Bmap = vo2ToMap(vo2Bjson);
+    const marAmap = marathonToMap(marAjson);
+    const marBmap = marathonToMap(marBjson);
+
+    // date labels: last 30 days
+    const last30 = getLastNDates(30);
+
+    // build series
+    const vo2ASeries = buildSeries(vo2Amap, last30);
+    const vo2BSeries = buildSeries(vo2Bmap, last30);
+    const marASeries = buildSeries(marAmap, last30);
+    const marBSeries = buildSeries(marBmap, last30);
+
+    // latest helpers
+    const latestVo2A = findLatestValue(vo2Amap);
+    const latestVo2B = findLatestValue(vo2Bmap);
+    const latestMarA = findLatestValue(marAmap);
+    const latestMarB = findLatestValue(marBmap);
+
+    // summary text
+    const parts = [];
+    if(latestMarA) parts.push(`${userA} marathon: ${latestMarA.value} (${latestMarA.date})`);
+    if(latestMarB) parts.push(`${userB} marathon: ${latestMarB.value} (${latestMarB.date})`);
+    if(latestVo2A) parts.push(`${userA} VO₂: ${latestVo2A.value} (${latestVo2A.date})`);
+    if(latestVo2B) parts.push(`${userB} VO₂: ${latestVo2B.value} (${latestVo2B.date})`);
+    showSummary(parts.join('   |   '));
+
+    // VO2 chart
+    const vo2Data = {
+      labels: last30,
+      datasets: [
+        {
+          label: `${userA} VO₂`,
+          data: vo2ASeries,
+          borderColor: 'rgba(75,192,192,1)',
+          backgroundColor: 'rgba(75,192,192,0.12)',
+          tension: 0.25,
+          pointRadius: 3,
+          spanGaps: true
+        },
+        {
+          label: `${userB} VO₂`,
+          data: vo2BSeries,
+          borderColor: 'rgba(255,99,132,1)',
+          backgroundColor: 'rgba(255,99,132,0.12)',
+          tension: 0.25,
+          pointRadius: 3,
+          spanGaps: true
+        }
+      ]
+    };
+    const vo2Options = {
+      responsive:true,
+      plugins:{ legend:{ display:true } },
+      scales:{
+        x:{ type:'category', title:{ display:true, text:'Date' } },
+        y:{ title:{ display:true, text:'VO₂ Max' }, beginAtZero:false }
+      },
+      maintainAspectRatio:false
+    };
+
+    // Marathon chart
+    const marData = {
+      labels: last30,
+      datasets: [
+        {
+          label: `${userA} marathon`,
+          data: marASeries,
+          borderColor: 'rgba(20,115,220,1)',
+          backgroundColor: 'rgba(20,115,220,0.10)',
+          tension: 0.2,
+          pointRadius: 3,
+          spanGaps: true
+        },
+        {
+          label: `${userB} marathon`,
+          data: marBSeries,
+          borderColor: 'rgba(255,140,0,1)',
+          backgroundColor: 'rgba(255,140,0,0.10)',
+          tension: 0.2,
+          pointRadius: 3,
+          spanGaps: true
+        }
+      ]
+    };
+    const marOptions = {
+      responsive:true,
+      plugins:{ legend:{ display:true } },
+      scales:{
+        x:{ type:'category', title:{ display:true, text:'Date' } },
+        y:{ title:{ display:true, text:'Marathon Shape' }, beginAtZero:false }
+      },
+      maintainAspectRatio:false
+    };
+
+    // render or update charts
+    const vo2Ctx = document.getElementById('vo2Chart').getContext('2d');
+    const marCtx = document.getElementById('marathonChart').getContext('2d');
+
+    vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Options, vo2Chart);
+    marathonChart = createOrUpdateChart(marCtx, marData, marOptions, marathonChart);
+
+  }catch(e){
+    showError(e.message);
+    showSummary('');
+  }
+}
+
+// initial load and button
+reloadBtn.addEventListener('click', loadAndRender);
+window.addEventListener('load', loadAndRender);
+</script>
 </body>
 </html>
