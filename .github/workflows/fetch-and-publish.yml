@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - name: Checkout
@@ -30,6 +29,7 @@ jobs:
 
       - name: Write storage_state files from secrets (if present)
         run: |
+          # Write secret values into files if the secrets are defined.
           if [ -n "${{ secrets.STORAGE_KRISTIN }}" ]; then
             echo "${{ secrets.STORAGE_KRISTIN }}" > storage_kristin.json
             echo "Wrote storage_kristin.json"
@@ -43,41 +43,22 @@ jobs:
             echo "STORAGE_AARON secret not set; skipping aaron"
           fi
 
-      - name: Fetch data in parallel (Kristin & Aaron)
+      - name: Fetch data for Kristin (if storage file exists)
         run: |
-          set -euo pipefail
-          # start kristin fetch if storage exists
           if [ -f storage_kristin.json ]; then
-            echo "Starting kristin fetch..."
-            (python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin > kristin_fetch.log 2>&1) &
-            P1=$!
+            echo "Fetching for kristin..."
+            python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin || true
           else
-            P1=""
-            echo "No storage_kristin.json; skipping kristin"
+            echo "No storage_kristin.json found; skipping kristin fetch"
           fi
 
-          # start aaron fetch if storage exists
+      - name: Fetch data for Aaron (if storage file exists)
+        run: |
           if [ -f storage_aaron.json ]; then
-            echo "Starting aaron fetch..."
-            (python scripts/play_fetch_runalyze.py fetch --storage storage_aaron.json --user aaron > aaron_fetch.log 2>&1) &
-            P2=$!
+            echo "Fetching for aaron..."
+            python scripts/play_fetch_runalyze.py fetch --storage storage_aaron.json --user aaron || true
           else
-            P2=""
-            echo "No storage_aaron.json; skipping aaron"
-          fi
-
-          # Wait for background jobs if they were started
-          if [ -n "${P1:-}" ]; then
-            echo "Waiting for kristin (PID $P1)..."
-            wait $P1 || echo "kristin fetch exited with non-zero"
-            echo "Kristin fetch finished. Log:"
-            tail -n +1 kristin_fetch.log || true
-          fi
-          if [ -n "${P2:-}" ]; then
-            echo "Waiting for aaron (PID $P2)..."
-            wait $P2 || echo "aaron fetch exited with non-zero"
-            echo "Aaron fetch finished. Log:"
-            tail -n +1 aaron_fetch.log || true
+            echo "No storage_aaron.json found; skipping aaron fetch"
           fi
 
       - name: Commit and push updated data
