@@ -1,11 +1,6 @@
-// docs/app.js - add multi-window marathon-shape projection (7/14/30/60d) and show recommended date
-// Compact, behavior-preserving app.js. Projections shown per-user in the header under "Last updated".
-// Projection algorithm (per your spec):
-//  - percent = value * 100
-//  - use the last W samples (W = window days) from the marathon series (most recent dates available)
-//  - if series already crossed 100% in the window, return interpolated crossing date
-//  - otherwise run least-squares linear regression (x = day as fractional days since epoch, y = percent)
-//    to estimate when y == 100% (return null if slope <= 0)
+// docs/app.js - fixed: ensure isMarathonGoal is defined so tables render (was causing "isMarathonGoal is not defined")
+// Includes multi-window projections and the reordered columns (Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly, Long Run).
+// Uses natural table layout (no measured colgroup) and relies on style.css for sizing.
 
 const USERS = ['kristin','aaron'];
 const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
@@ -21,6 +16,7 @@ const fetchJSON = async p => {
 
 const isoToKey = iso => { const d=new Date(iso); if(isNaN(d)) return null; return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; };
 const lastNDates = n => { const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())); d.setUTCDate(d.getUTCDate()-i); out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`); } return out; };
+
 const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi');
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
 
@@ -40,8 +36,8 @@ const findLatest = m => {
   return null;
 };
 
-// Helper: linear regression (x and y arrays) => {slope, intercept}
-// x should be numeric (days), y numeric (percent)
+// --- Regression + projection helpers ---
+// simple least-squares regression on (x days since epoch, y percent)
 function linearRegression(x, y){
   if(!x.length || x.length !== y.length) return null;
   const n = x.length;
@@ -55,47 +51,39 @@ function linearRegression(x, y){
   const meanX = sumX/n;
   const meanY = sumY/n;
   const denom = (sumXX - n*meanX*meanX);
-  if(Math.abs(denom) < 1e-12) return { slope: 0, intercept: meanY }; // vertical-like case
+  if(Math.abs(denom) < 1e-12) return { slope: 0, intercept: meanY };
   const slope = (sumXY - n*meanX*meanY) / denom;
   const intercept = meanY - slope*meanX;
   return { slope, intercept };
 }
 
-// Given arrays of labels (ISO yyyy-mm-dd) and values (raw marathon shape like 0.65),
-// build arrays appropriate for regression (x = days since epoch, y = percent)
+// build x (days) and y (percent) arrays from labels and raw (0.xx) values
 function buildXY(labels, values){
   const msPerDay = 1000*60*60*24;
   const x = [], y = [];
   for(let i=0;i<labels.length;i++){
     const dt = new Date(labels[i] + 'T00:00:00Z');
     if(isNaN(dt)) continue;
-    const xi = dt.getTime()/msPerDay; // days since epoch as float
+    const xi = dt.getTime()/msPerDay; // days since epoch
     const vi = values[i];
     if(vi == null || isNaN(Number(vi))) continue;
     x.push(xi);
-    y.push(Number(vi) * 100); // convert to percent
+    y.push(Number(vi) * 100); // percent
   }
   return { x, y };
 }
 
-// If the series crosses 100% inside the given slice (labels[]/values[]), return a Date of crossing (interpolated),
-// otherwise return null
+// if the slice already crosses threshold (100%), interpolate and return Date, else null
 function findDateReachedFromLabels(labels, values, threshold = 100){
-  // labels array of ISO dates, values raw (0.65)
   for(let i=0;i<labels.length;i++){
     const cur = Number(values[i]);
     if(isNaN(cur)) continue;
     const curPct = cur * 100;
     if(curPct >= threshold){
-      if(i === 0){
-        // first sample already >= threshold
-        return new Date(labels[0] + 'T00:00:00Z');
-      }
-      // interpolate between previous and current
+      if(i === 0) return new Date(labels[0] + 'T00:00:00Z');
       const prev = Number(values[i-1]);
       const prevPct = prev * 100;
       const frac = (threshold - prevPct) / (curPct - prevPct);
-      // clamp
       const f = Math.max(0, Math.min(1, frac));
       const d0 = new Date(labels[i-1] + 'T00:00:00Z').getTime();
       const d1 = new Date(labels[i] + 'T00:00:00Z').getTime();
@@ -106,41 +94,32 @@ function findDateReachedFromLabels(labels, values, threshold = 100){
   return null;
 }
 
-// Estimate reach date via regression. Returns Date or null if slope <= 0 or insufficient data
 function estimateReachDate(labels, values, threshold = 100){
   const { x, y } = buildXY(labels, values);
   if(x.length < 2) return null;
   const reg = linearRegression(x, y);
   if(!reg) return null;
-  const slope = reg.slope; // percent per day (because x is days)
+  const slope = reg.slope;
   const intercept = reg.intercept;
   if(slope <= 0) return null;
-  // Solve for x where y = threshold => x = (threshold - intercept) / slope
   const targetX = (threshold - intercept) / slope;
   if(!isFinite(targetX)) return null;
   const msPerDay = 1000*60*60*24;
-  const t = Math.round(targetX * msPerDay);
-  return new Date(t);
+  return new Date(Math.round(targetX * msPerDay));
 }
 
-// Compute projection for a specific window (number of days): use last windowDays of the available sorted series
 function projectionForWindow(sortedDates, sortedValues, windowDays){
-  // take last windowDays samples (or fewer if not enough)
   const N = sortedDates.length;
   if(N === 0) return null;
   const L = Math.min(windowDays, N);
   const sliceDates = sortedDates.slice(N - L);
   const sliceValues = sortedValues.slice(N - L);
-  // check if already reached within slice
   const reached = findDateReachedFromLabels(sliceDates, sliceValues, 100);
   if(reached) return reached;
-  // else estimate via regression
   return estimateReachDate(sliceDates, sliceValues, 100);
 }
 
-// Compute projections map for windows in PROJECTION_WINDOWS; returns {7:Date|null, ...}
 function computeProjectionsFromSeries(seriesObj){
-  // seriesObj is { '2025-10-01': 0.17, ... }
   const dates = Object.keys(seriesObj).sort();
   const values = dates.map(d => seriesObj[d]);
   const out = {};
@@ -150,7 +129,6 @@ function computeProjectionsFromSeries(seriesObj){
   return out;
 }
 
-// pickRecommendedDate: median of available projection dates (as described earlier), null if none
 function pickRecommendedDate(projMap){
   const dates = PROJECTION_WINDOWS.map(w => projMap[w]).filter(Boolean).map(d => d.getTime()).sort((a,b)=>a-b);
   if(!dates.length) return null;
@@ -158,7 +136,6 @@ function pickRecommendedDate(projMap){
   return new Date(dates[mid]);
 }
 
-// format projection map for display (short)
 function formatProjMap(projMap){
   return PROJECTION_WINDOWS.map(w => {
     const dt = projMap[w];
@@ -166,8 +143,20 @@ function formatProjMap(projMap){
   }).join(', ');
 }
 
-/* --- UI + main flow (unchanged structure; we now compute and display projections) --- */
+// --- IMPORTANT: ensure this helper is defined and exported locally so code doesn't crash ---
+// Return true if a row represents the marathon goal (26.2 / 100%)
+function isMarathonGoal(r){
+  if(!r) return false;
+  if(typeof r.required_pct === 'number' && r.required_pct === 100) return true;
+  if(typeof r.requiredPct === 'number' && r.requiredPct === 100) return true;
+  if(typeof r.distance_mi === 'number' && Math.abs(r.distance_mi - 26.2) < 0.2) return true;
+  if(typeof r.mi === 'number' && Math.abs(r.mi - 26.2) < 0.2) return true;
+  const lbl = (r.distance_label || r.label || '').toString().toLowerCase();
+  if(lbl.includes('26,2') || lbl.includes('26.2') || /\b26\b/.test(lbl)) return true;
+  return false;
+}
 
+// --- Chart helper (VO2) ---
 let vo2Chart = null;
 function drawVo2(ctx, labels, datasets){
   const data = { labels, datasets };
@@ -176,17 +165,18 @@ function drawVo2(ctx, labels, datasets){
   vo2Chart = new Chart(ctx, { type:'line', data, options:opts });
 }
 
+// --- Main: load data, compute projections, render table/chart ---
 async function loadAndRender(){
   const errorsEl = el('errors');
   try{
     if(errorsEl) errorsEl.textContent = '';
 
-    // fetch all data in parallel
+    // fetch all files
     const fetches = [];
     USERS.forEach(u => DATA_FILES.forEach(f => fetches.push(fetchJSON(`data/${u}_${f}.json`).catch(()=>null))));
     const results = await Promise.all(fetches);
 
-    // assemble per-user data
+    // assemble per-user
     const users = {};
     for(let i=0;i<USERS.length;i++){
       const base = i * DATA_FILES.length;
@@ -198,7 +188,7 @@ async function loadAndRender(){
       };
     }
 
-    // VO2 chart (last 30)
+    // VO2 chart
     const last30 = lastNDates(30);
     const datasets = USERS.map((u, idx) => {
       const map = vo2Map(users[u].vo2);
@@ -228,12 +218,11 @@ async function loadAndRender(){
         }
       }
 
-      // compute projections for this user's marathon series
-      const projMap = computeProjectionsFromSeries(marSeries); // {7:Date|null,...}
+      // projections
+      const projMap = computeProjectionsFromSeries(marSeries);
       const rec = pickRecommendedDate(projMap);
-
-      // build header: include projections summary line (compact)
       const projText = `Projections: ${formatProjMap(projMap)}${rec ? ` — rec: ${rec.toISOString().slice(0,10)}` : ''}`;
+
       const header = `
         <div class="user-block user-${u}">
           <div>
@@ -246,7 +235,7 @@ async function loadAndRender(){
           </div>
         </div>`;
 
-      // construct rows (prefer parsed requirements, fallback as before) and reuse the same column order already implemented previously
+      // build rows (prefer parsed requirements)
       const req = d.requirements;
       let rows = [];
       if(req && Array.isArray(req.entries) && req.entries.length){
@@ -286,7 +275,6 @@ async function loadAndRender(){
             goal: (r.p === 100)
           };
         });
-        // try best-effort to fill prognosis times from d.prognosis.entries
         if(d.prognosis && Array.isArray(d.prognosis.entries)){
           rows = rows.map(row=>{
             const match = d.prognosis.entries.find(e=>{
@@ -300,7 +288,6 @@ async function loadAndRender(){
         }
       }
 
-      // render rows in the new order (Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly, Long Run)
       const rowsHtml = rows.map(r => `
         <tr class="r${r.goal ? ' marathon-goal top-separated bottom-separated' : ''}">
           <td class="nowrap-mi">${r.distance}</td>
