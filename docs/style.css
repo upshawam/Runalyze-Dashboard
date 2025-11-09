@@ -1,4 +1,8 @@
-/* Centralized styles for the Runalyze-like tables and page (updated: marathon-goal shade + compact widths) */
+/* Centralized styles for the Runalyze-like tables and page
+   Updated: remove table-layout:fixed/colgroup approach, let browser size columns,
+   constrain Weekly / Prognosis / Optimum with max-widths and wrapping,
+   display:inline-table so table shrinks to content and doesn't stretch.
+*/
 
 :root{
   --page-max-width:1100px;
@@ -8,7 +12,7 @@
   --strong-sep: #d6d6d6;
   --accent-ok: #1a9a42;
   --accent-bad: #c1392b;
-  --marathon-shade: #f0f5fb; /* distinct shade for marathon goal row */
+  --marathon-shade: #f0f5fb;
 }
 
 *{box-sizing:border-box}
@@ -28,18 +32,21 @@ body {
 .chart-heading { margin:6px 0 8px; font-size:0.94rem; }
 canvas { width:100% !important; height:300px !important; display:block; background:#fff; border-radius:4px; }
 
-.tables-wrap { max-width:var(--page-max-width); margin:6px auto 24px; }
+/* Container: allow horizontal scroll if table is wider than viewport */
+.tables-wrap { max-width:var(--page-max-width); margin:6px auto 24px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
 
+/* Keep a thin padding around the table block */
 .rz-wrapper { padding:6px 0; }
 
-/* Compact Runalyze-like table */
+/* Let the table decide its own natural widths (auto layout), and shrink to content */
 .rz-table{
-  width:100%;
-  border-collapse:collapse;
+  display:inline-table;      /* shrink-to-content */
+  table-layout: auto;        /* let browser compute column width based on content */
   font-size:0.92rem;
   color:#333;
   background:#fff;
-  table-layout: fixed; /* enforce colgroup widths */
+  border-collapse:collapse;
+  margin: 0;                 /* no extra margins (table width now only its content) */
 }
 
 /* Group header row */
@@ -78,11 +85,26 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
   vertical-align:middle;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap;
+  white-space:nowrap; /* default: single line to keep rows tight */
 }
 
-/* allow weekly mileage (3rd column) to wrap if needed */
-.rz-table tbody td:nth-child(3){ white-space:normal; }
+/* allow weekly mileage (3rd column) to wrap within a constrained width */
+.rz-table tbody td:nth-child(3),
+.rz-table thead th:nth-child(3) {
+  white-space:normal;
+  max-width:180px;      /* constrain weekly mileage column */
+  word-break:break-word;
+}
+
+/* constrain prognosis/optimum to smaller space and allow wrapping */
+.rz-table tbody td:nth-child(7),
+.rz-table thead th:nth-child(7),
+.rz-table tbody td:nth-child(8),
+.rz-table thead th:nth-child(8) {
+  white-space:normal;
+  max-width:120px;      /* narrower for prognosis/optimum */
+  word-break:break-word;
+}
 
 /* alternating row background */
 .rz-table tbody tr:nth-child(odd) td{ background:#fff; }
@@ -101,6 +123,11 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 .hidden-mobile{ display:table-cell; }
 @media (max-width:920px){
   .hidden-mobile{ display:none; }
+  /* when hidden, allow table to shrink further */
+  .rz-table tbody td:nth-child(7),
+  .rz-table thead th:nth-child(7),
+  .rz-table tbody td:nth-child(8),
+  .rz-table thead th:nth-child(8) { max-width: 1px; }
 }
 
 /* small helper text */
@@ -125,7 +152,7 @@ canvas { width:100% !important; height:300px !important; display:block; backgrou
 .user-title{ font-weight:700; font-size:0.98rem; margin:0; }
 .user-meta{ text-align:right; font-size:0.84rem; color:var(--muted); margin-top:2px; }
 
-/* responsive */
+/* responsive tweaks */
 @media (max-width:720px){
   .rz-table thead tr.label-row th, .rz-table tbody td{ padding:5px 6px; font-size:0.88rem; }
   canvas{ height:240px !important; }
