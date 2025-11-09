@@ -14,7 +14,7 @@
 </head>
 <body>
   <h1>Runalyze Dashboard (static)</h1>
-  <div class="note">If charts are empty, confirm the JSON files exist at <code>/docs/data/&lt;user&gt;_marathon.json</code> and <code>/docs/data/&lt;user&gt;_vo2.json</code>.</div>
+  <div class="note">If charts are empty, confirm the JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
 
   <div id="controls">
     <label>User A: <input id="userA" value="kristin"></label>
@@ -96,11 +96,11 @@
       const a = document.getElementById('userA').value.trim() || 'kristin';
       const b = document.getElementById('userB').value.trim() || 'aaron';
 
-      // Use /docs/data path as requested
-      const mAPath = `/docs/data/${a}_marathon.json`;
-      const mBPath = `/docs/data/${b}_marathon.json`;
-      const vAPath = `/docs/data/${a}_vo2.json`;
-      const vBPath = `/docs/data/${b}_vo2.json`;
+      // Use absolute /data path (GitHub Pages publishes docs/ as site root in this repo)
+      const mAPath = `/data/${a}_marathon.json`;
+      const mBPath = `/data/${b}_marathon.json`;
+      const vAPath = `/data/${a}_vo2.json`;
+      const vBPath = `/data/${b}_vo2.json`;
 
       try {
         const [mA, mB, vA, vB] = await Promise.all([
