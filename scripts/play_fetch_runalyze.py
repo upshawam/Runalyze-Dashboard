@@ -2,16 +2,23 @@
 """
 play_fetch_runalyze.py
 
-Interactive helper to create Playwright storage_state files (one-time per account)
-and a convenience fetch command to use that storage_state to fetch Runalyze endpoints
-(marathon-shape, vo2max) and the Prognosis panel HTML (parsed into JSON + raw HTML saved).
+Helper to create Playwright storage_state files (one-time per account)
+and to fetch Runalyze endpoints/pages using that storage_state.
 
-Usage (interactive login -> produce storage JSON):
+This script:
+ - fetches marathon-shape data (internal JSON endpoint),
+ - fetches vo2max trend JSON,
+ - fetches the Prognosis plugin HTML and parses it into JSON,
+ - fetches the Marathon Shape page HTML and parses the requirements table (including "Optimum")
+   and writes it to docs/data/<user>_marathon_requirements.json.
+
+Usage:
   python scripts/play_fetch_runalyze.py login --storage storage_kristin.json
+  python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin
 
-Usage (headless fetch using an existing storage JSON):
-  python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin \
-    --from-date 2025-08-10 --to-date 2025-11-08
+Notes:
+ - Requires Playwright: pip install playwright
+ - Install browsers: playwright install
 """
 import argparse
 import json
@@ -22,13 +29,13 @@ import sys
 import re
 from playwright.sync_api import sync_playwright
 
-# Write fetched data into docs/data so the workflow can commit it for GitHub Pages
 DATA_DIR = Path("docs/data")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 MARATHON_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/marathon-shape/{from_date}/{to_date}"
 VO2_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/vo2max/{from_ts}/{to_ts}"
 PROG_URL = "https://runalyze.com/plugin/RunalyzePluginPanel_Prognose/window.plot.php"
+MAR_SHAPE_PAGE = "https://runalyze.com/my/marathon-shape"
 
 def interactive_login(storage_path: str, browser_type: str = "chromium"):
     storage_path = Path(storage_path)
@@ -47,7 +54,7 @@ def to_epoch_seconds(date_str: str):
     dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     return int(calendar.timegm(dt.timetuple()))
 
-def fetch_with_storage(storage_state_path: str, url: str, browser_type: str = "chromium"):
+def fetch_with_storage(storage_state_path: str, url: str, browser_type: str = "chromium", prefer_page_content=False):
     storage_state_path = Path(storage_state_path)
     if not storage_state_path.exists():
         return {"error": "storage_state_missing", "path": str(storage_state_path)}
@@ -59,7 +66,10 @@ def fetch_with_storage(storage_state_path: str, url: str, browser_type: str = "c
             resp = page.goto(url, wait_until="networkidle", timeout=30000)
             if resp is None:
                 return {"error": "no_response", "url": url}
-            text = resp.text()
+            if prefer_page_content:
+                text = page.content()
+            else:
+                text = resp.text()
         except Exception as e:
             return {"error": "playwright_error", "exception": str(e)}
         finally:
@@ -67,30 +77,28 @@ def fetch_with_storage(storage_state_path: str, url: str, browser_type: str = "c
         try:
             return json.loads(text)
         except Exception:
+            # Return raw text for debugging (e.g., login HTML or page HTML)
             return {"error": "non_json_response", "text": text}
 
 def parse_prognosis_html(html_text: str):
     """
-    Parse the Prognosis panel HTML to extract predicted distances, times and paces.
-    Returns list of entries like:
-      [{ "distance_mi": 1.86, "distance_label": "1,86 mi", "time": "13:13", "pace": "7:05/mi" }, ...]
+    Parse Prognosis plugin HTML into entries:
+      [{ distance_label, distance_mi, time, pace }, ...]
+    Also returns meta: login_detected, found
     """
     if not html_text or not isinstance(html_text, str):
-        return {"error": "no_html"}
+        return {"meta": {"login_detected": False, "found": False}, "entries": []}
 
-    # Quick login detection to surface when storage_state is stale
     lower = html_text.lower()
     login_indicators = ['login', 'signin', 'sign in', 'two-factor', '2fa']
     login_detected = any(tok in lower for tok in login_indicators)
 
-    # Try to extract the panel-content block first (safer than scanning whole page)
+    # Try to extract the panel-content block first
     panel_match = re.search(r'<div[^>]+class=["\']panel-content["\'][^>]*>(.*?)</div>', html_text, re.S | re.I)
     block = panel_match.group(1) if panel_match else html_text
 
     entries = []
-    # Find <p>...</p> blocks inside the panel content
     p_blocks = re.findall(r'<p[^>]*>(.*?)</p>', block, re.S | re.I)
-    # tolerant regex for the common structure: time in <strong> inside right span, pace in <small>, distance in <strong> later
     p_re = re.compile(
         r'<span[^>]*class=["\']right["\'][^>]*>.*?<strong[^>]*>\s*([^<]+?)\s*</strong>.*?<small[^>]*>\s*\(?([^<\)]+?)\)?\s*</small>.*?</span>.*?<strong[^>]*>\s*([^<]+?mi)\s*</strong>',
         re.S | re.I)
@@ -113,7 +121,7 @@ def parse_prognosis_html(html_text: str):
                 "pace": pace_str
             })
 
-    # fallback: if none found in <p>s, try a more global regex
+    # fallback global regex
     if not entries:
         global_pattern = re.compile(
             r'<p[^>]*>.*?(?:<strong[^>]*>\s*([^<]+?)\s*</strong>).*?(?:<small[^>]*>\s*\(?([^<\)]+?)\)?\s*</small>).*?(?:<strong[^>]*>\s*([^<]+?mi)\s*</strong>).*?</p>',
@@ -136,7 +144,7 @@ def parse_prognosis_html(html_text: str):
                 "pace": pace_str
             })
 
-    # Final fallback: look for lines that contain 'mi' and a time pattern "mm:ss" or "h:mm:ss"
+    # final fallback: look for lines that contain 'mi' and a time pattern
     if not entries:
         simple_pattern = re.compile(r'([0-9\.,]+\s*mi).*?([0-9]{1,2}:[0-5][0-9](?::[0-5][0-9])?).*?(\([0-9]{1,2}:[0-5][0-9]\/mi\))', re.S | re.I)
         for m in simple_pattern.findall(html_text):
@@ -156,7 +164,6 @@ def parse_prognosis_html(html_text: str):
                 "pace": pace_str
             })
 
-    # sort entries by numeric distance when possible
     try:
         entries.sort(key=lambda e: (e.get("distance_mi") is None, e.get("distance_mi") or 0))
     except Exception:
@@ -164,42 +171,149 @@ def parse_prognosis_html(html_text: str):
 
     return {"meta": {"login_detected": bool(login_detected), "found": len(entries) > 0}, "entries": entries}
 
+def parse_marathon_requirements_html(html_text: str):
+    """
+    Parse the Marathon Shape page table rows into structured entries.
+    Expected columns (based on Runalyze HTML):
+      Distance | Marathon Shape (required %) | Weekly mileage | Long Run | Achieved (%) | Achieved icon | Prognosis (time) | Optimum (time)
+
+    Returns structure: { meta: {...}, entries: [ { distance_label, distance_mi, required_pct, weekly, long_run, achieved_pct, achieved_ok, prognosis_time, optimum_time }, ... ] }
+    """
+    if not html_text or not isinstance(html_text, str):
+        return {"meta": {"login_detected": False, "found": False}, "entries": []}
+
+    lower = html_text.lower()
+    login_indicators = ['login', 'signin', 'sign in', 'two-factor', '2fa']
+    login_detected = any(tok in lower for tok in login_indicators)
+
+    # Try to extract the table block first
+    table_match = re.search(r'<table[^>]*class=["\'][^"\']*zebra-style[^"\']*["\'][^>]*>(.*?)</table>', html_text, re.S | re.I)
+    block = table_match.group(1) if table_match else html_text
+
+    entries = []
+    # Find table rows
+    tr_pattern = re.compile(r'<tr[^>]*class=["\'][^"\']*r[^"\']*["\'][^>]*>(.*?)</tr>', re.S | re.I)
+    td_pattern = re.compile(r'<td[^>]*>(.*?)</td>', re.S | re.I)
+
+    for tr in tr_pattern.findall(block):
+        # extract all <td> contents in the row
+        tds = td_pattern.findall(tr)
+        # normalize and strip tags inside cells
+        def clean_html(s):
+            s = re.sub(r'<[^>]+>', '', s)  # remove any inner tags
+            s = s.replace('&nbsp;', ' ')
+            return s.strip()
+
+        if len(tds) < 7:
+            # try to skip header or malformed rows
+            continue
+
+        try:
+            distance_cell = clean_html(tds[0])
+            required_cell = clean_html(tds[1])
+            weekly_cell = clean_html(tds[2])
+            longrun_cell = clean_html(tds[3])
+            achieved_cell = clean_html(tds[4])
+            # tds[5] is icon cell (check or x)
+            prognosis_cell = clean_html(tds[6]) if len(tds) > 6 else None
+            optimum_cell = clean_html(tds[7]) if len(tds) > 7 else None
+        except Exception:
+            continue
+
+        # parse numbers
+        distance_mi = None
+        try:
+            dist_clean = re.sub(r'[^\d,\.]', '', distance_cell).replace(',', '.')
+            distance_mi = float(dist_clean) if dist_clean else None
+        except Exception:
+            distance_mi = None
+
+        required_pct = None
+        try:
+            req_clean = re.sub(r'[^\d\.]', '', required_cell)
+            required_pct = int(req_clean) if req_clean else None
+        except Exception:
+            required_pct = None
+
+        achieved_pct = None
+        try:
+            ach_clean = re.sub(r'[^\d\.]', '', achieved_cell)
+            achieved_pct = int(ach_clean) if ach_clean else None
+        except Exception:
+            achieved_pct = None
+
+        # achieved icon: check for 'fa-check' in original tds[5]
+        achieved_ok = False
+        try:
+            if re.search(r'fa-check', tds[5], re.I):
+                achieved_ok = True
+            elif re.search(r'fa-xmark|fa-times|xmark|minus', tds[5], re.I):
+                achieved_ok = False
+        except Exception:
+            achieved_ok = False
+
+        prognosis_time = prognosis_cell if prognosis_cell and prognosis_cell != '-' else None
+        optimum_time = optimum_cell if optimum_cell and optimum_cell != '-' else None
+
+        entries.append({
+            "distance_label": distance_cell,
+            "distance_mi": distance_mi,
+            "required_pct": required_pct,
+            "weekly": weekly_cell,
+            "long_run": longrun_cell,
+            "achieved_pct": achieved_pct,
+            "achieved_ok": achieved_ok,
+            "prognosis_time": prognosis_time,
+            "optimum_time": optimum_time
+        })
+
+    return {"meta": {"login_detected": bool(login_detected), "found": len(entries) > 0}, "entries": entries}
+
 def fetch_prognosis(storage_state_path: str, user_label: str):
-    """
-    Fetch the prognosis panel HTML using the provided storage_state.
-    Save raw HTML to docs/data/<user>_prognosis.html and parsed JSON to docs/data/<user>_prognosis.json.
-    Return the parsed structure (same as written to JSON).
-    """
     storage_state_path = Path(storage_state_path)
     if not storage_state_path.exists():
         return {"error": "storage_state_missing", "path": str(storage_state_path)}
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state=str(storage_state_path))
         page = context.new_page()
         try:
-            resp = page.goto(PROG_URL, wait_until="networkidle", timeout=30000)
-            if resp is None:
-                return {"error": "no_response", "url": PROG_URL}
-            # prefer page.content() for full HTML
+            page.goto(PROG_URL, wait_until="networkidle", timeout=30000)
             text = page.content()
         except Exception as e:
             return {"error": "playwright_error", "exception": str(e)}
         finally:
             browser.close()
 
-    # save raw html for debugging
-    prog_out_html = DATA_DIR / f"{user_label}_prognosis.html"
-    prog_out_html.write_text(text, encoding='utf-8')
-
-    # parse
     parsed = parse_prognosis_html(text)
+    out = DATA_DIR / f"{user_label}_prognosis.json"
+    out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+    # write raw html for debugging
+    raw_html_out = DATA_DIR / f"{user_label}_prognosis.html"
+    raw_html_out.write_text(text, encoding="utf-8")
+    return parsed
 
-    # write JSON with debug meta
-    prog_out = DATA_DIR / f"{user_label}_prognosis.json"
-    prog_out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+def fetch_marathon_requirements(storage_state_path: str, user_label: str):
+    storage_state_path = Path(storage_state_path)
+    if not storage_state_path.exists():
+        return {"error": "storage_state_missing", "path": str(storage_state_path)}
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(storage_state=str(storage_state_path))
+        page = context.new_page()
+        try:
+            page.goto(MAR_SHAPE_PAGE, wait_until="networkidle", timeout=30000)
+            text = page.content()
+        except Exception as e:
+            return {"error": "playwright_error", "exception": str(e)}
+        finally:
+            browser.close()
 
+    parsed = parse_marathon_requirements_html(text)
+    out = DATA_DIR / f"{user_label}_marathon_requirements.json"
+    out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+    raw_html_out = DATA_DIR / f"{user_label}_marathon_requirements.html"
+    raw_html_out.write_text(text, encoding="utf-8")
     return parsed
 
 def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_date="2025-11-08"):
@@ -211,7 +325,7 @@ def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_dat
     vo2_to_ts = to_epoch_seconds(to_date) + 86399
     vo2_url = VO2_TEMPLATE.format(from_ts=vo2_from_ts, to_ts=vo2_to_ts)
 
-    print(f"[{user_label}] Fetching marathon-shape: {marathon_url}")
+    print(f"[{user_label}] Fetching marathon-shape (internal JSON): {marathon_url}")
     marathon_json = fetch_with_storage(str(storage_path), marathon_url)
     marathon_out = DATA_DIR / f"{user_label}_marathon.json"
     marathon_out.write_text(json.dumps(marathon_json, indent=2), encoding="utf-8")
@@ -225,7 +339,11 @@ def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_dat
 
     print(f"[{user_label}] Fetching prognosis panel: {PROG_URL}")
     prog_parsed = fetch_prognosis(str(storage_path), user_label)
-    print(f"[{user_label}] Wrote prognosis for {user_label} (entries: {prog_parsed.get('entries') and len(prog_parsed.get('entries')) or 0})")
+    print(f"[{user_label}] Wrote prognosis (entries: {prog_parsed.get('entries') and len(prog_parsed.get('entries')) or 0})")
+
+    print(f"[{user_label}] Fetching marathon requirements page: {MAR_SHAPE_PAGE}")
+    mr_parsed = fetch_marathon_requirements(str(storage_path), user_label)
+    print(f"[{user_label}] Wrote marathon requirements (entries: {mr_parsed.get('entries') and len(mr_parsed.get('entries')) or 0})")
 
 def main():
     parser = argparse.ArgumentParser(description="Playwright helper for Runalyze storage and fetch")
