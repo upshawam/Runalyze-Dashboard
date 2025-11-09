@@ -1,0 +1,127 @@
+/* Centralized styles for the Runalyze-like tables and page */
+
+/* Page baseline (tight) */
+:root{
+  --page-max-width:1100px;
+  --muted: #666;
+  --border: #e6e6e6;
+  --row-alt: #fbfcfd;
+  --strong-sep: #d6d6d6;
+  --accent-ok: #1a9a42;
+  --accent-bad: #c1392b;
+}
+
+*{box-sizing:border-box}
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  margin: 10px;
+  background:#fff;
+  color:#222;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.page-title { font-size:0.98rem; font-weight:700; margin-bottom:6px; }
+.note { color:var(--muted); font-size:0.88rem; margin-bottom:8px; }
+
+.chart-wrap { max-width:var(--page-max-width); margin:10px auto; }
+.chart-heading { margin:6px 0 8px; font-size:0.94rem; }
+canvas { width:100% !important; height:300px !important; display:block; background:#fff; border-radius:4px; }
+
+.tables-wrap { max-width:var(--page-max-width); margin:6px auto 24px; }
+
+.rz-wrapper { padding:6px 0; }
+
+/* Compact Runalyze-like table */
+.rz-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:0.92rem;
+  color:#333;
+  background:#fff;
+  table-layout: fixed; /* enforce colgroup widths */
+}
+
+/* Group header row */
+.rz-table thead tr.group-row th{
+  text-align:center;
+  font-weight:700;
+  padding:5px 4px;
+  border-bottom:1px solid var(--border);
+  background:transparent;
+  font-size:0.94rem;
+}
+
+/* Column labels row */
+.rz-table thead tr.label-row th{
+  font-weight:700;
+  padding:7px 8px;
+  background:#fafafa;
+  border-bottom:1px solid var(--border);
+  text-align:left;
+  font-size:0.90rem;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* vertical dividers between column groups */
+.rz-table thead tr.label-row th:nth-child(2),
+.rz-table tbody td:nth-child(2){ border-left:1px solid var(--border); }
+.rz-table thead tr.label-row th:nth-child(5),
+.rz-table tbody td:nth-child(5){ border-left:1px solid var(--border); }
+
+/* cell spacing (reduced for compact look) */
+.rz-table tbody td{
+  padding:6px 8px;
+  border-bottom:1px solid #f2f2f2;
+  vertical-align:middle;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* allow weekly mileage (3rd column) to wrap if needed */
+.rz-table tbody td:nth-child(3){ white-space:normal; }
+
+/* alternating row background */
+.rz-table tbody tr:nth-child(odd) td{ background:#fff; }
+.rz-table tbody tr:nth-child(even) td{ background:var(--row-alt); }
+
+/* distance column: bold, compact */
+.rz-table tbody td:nth-child(1){ font-weight:700; white-space:nowrap; padding-left:8px; }
+
+/* achieved column: centered and compact */
+.rz-table tbody td:nth-child(5){ text-align:center; white-space:nowrap; padding-right:8px; }
+
+/* center helper */
+.center{ text-align:center; }
+
+/* hide certain columns on narrow screens */
+.hidden-mobile{ display:table-cell; }
+@media (max-width:920px){
+  .hidden-mobile{ display:none; }
+}
+
+/* small helper text */
+.small{ font-size:0.85rem; color:var(--muted); margin:0; padding:0; }
+
+/* marathon goal separators */
+.top-separated td{ border-top:1.6px solid var(--strong-sep); }
+.bottom-separated td{ border-bottom:1.6px solid var(--strong-sep); }
+
+/* icons */
+.fa-check.plus, .plus{ color:var(--accent-ok); font-weight:700; }
+.fa-xmark.minus, .minus{ color:var(--accent-bad); font-weight:700; }
+.fa-solid{ font-size:0.95rem; vertical-align:middle; }
+
+/* user header compact */
+.user-block{ display:flex; justify-content:space-between; align-items:flex-start; margin:8px 0 4px; gap:8px; }
+.user-title{ font-weight:700; font-size:0.98rem; margin:0; }
+.user-meta{ text-align:right; font-size:0.84rem; color:var(--muted); margin-top:2px; }
+
+/* responsive */
+@media (max-width:720px){
+  .rz-table thead tr.label-row th, .rz-table tbody td{ padding:5px 6px; font-size:0.88rem; }
+  canvas{ height:240px !important; }
+}
