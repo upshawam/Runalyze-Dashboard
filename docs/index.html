@@ -24,7 +24,8 @@
 
     h2 { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:0 0 12px 0; }
     .mar-pct { font-size:0.95rem; color:#222; font-weight:700; }
-    .status { margin-top:8px; color:#333; font-weight:600; text-align:center; }
+    /* Hide the status line from view as requested */
+    .status { display: none; }
     .error { color:#b00; font-weight:700; margin-top:8px; text-align:center; }
 
     @media (max-width:700px) {
@@ -53,18 +54,17 @@
 <script>
 /*
   Minimal dynamic page:
-  - No top controls (stripped as requested).
   - Fixed users: kristin and aaron.
   - Shows latest marathon shape percentages next to the Marathon Shape title.
   - Loads JSON from data/<user>_vo2.json and data/<user>_marathon.json and plots the last 30 days.
 */
 
 const errorsEl = document.getElementById('errors');
-const statusEl = document.getElementById('status');
+const statusEl = document.getElementById('status'); // kept for accessibility but hidden visually
 const marPctEl = document.getElementById('marathonPct');
 
 function showError(msg){ errorsEl.textContent = msg || ''; if(msg) console.error(msg); }
-function showStatus(msg){ statusEl.textContent = msg || ''; }
+function showStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
 
 async function fetchJSON(path){
   try{
@@ -154,6 +154,7 @@ let marathonChart = null;
 
 async function loadAndRender(){
   errorsEl.textContent = '';
+  // status is hidden visually; still set for accessibility if needed
   showStatus('Loading…');
 
   try{
@@ -187,7 +188,7 @@ async function loadAndRender(){
     const nameB = userB.charAt(0).toUpperCase() + userB.slice(1);
     marPctEl.textContent = `${nameA}: ${pA}   ${nameB}: ${pB}`;
 
-    // update status line with concise info
+    // update hidden status line with concise info (kept hidden)
     const latestVo2A = findLatestValue(vo2Amap);
     const latestVo2B = findLatestValue(vo2Bmap);
     const parts = [];
@@ -222,6 +223,9 @@ async function loadAndRender(){
 
     vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Opts, vo2Chart);
     marathonChart = createOrUpdateChart(marCtx, marData, marOpts, marathonChart);
+
+    // Clear any error text
+    showError('');
 
   }catch(e){
     showError(e.message);
