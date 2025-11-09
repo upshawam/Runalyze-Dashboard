@@ -24,17 +24,26 @@
 
     h2 { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:0 0 12px 0; }
     .mar-pct { font-size:0.95rem; color:#222; font-weight:700; }
-    /* Hide the status line from view as requested */
-    .status { display: none; }
+    .status { display: none; } /* hidden as requested */
     .error { color:#b00; font-weight:700; margin-top:8px; text-align:center; }
+
+    /* prognosis table */
+    .prog-table { width:100%; max-width:800px; margin:10px auto 0; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+    .prog-table th, .prog-table td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left; }
+    .prog-table th { background:#f6f8fb; font-weight:700; }
+    .prog-header { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1200px; margin:0 auto; }
 
     @media (max-width:700px) {
       canvas { height:300px !important; }
       h2 { flex-direction:column; align-items:flex-start; gap:6px; }
+      .prog-table th, .prog-table td { padding:6px 8px; }
     }
   </style>
 </head>
 <body>
+  <div class="page-title">VO₂ Max & Marathon Shape (static)</div>
+  <div class="note">Displaying the last 30 days. Data is loaded from data/&lt;user&gt;_vo2.json and data/&lt;user&gt;_marathon.json.</div>
+
   <div id="errors" class="error" aria-live="polite"></div>
   <div id="status" class="status" aria-live="polite"></div>
 
@@ -44,24 +53,36 @@
   </section>
 
   <section class="chart-wrap" aria-labelledby="mar-title">
-    <h2 id="mar-title">
-      <span>Marathon Shape (last 30 days)</span>
-      <span id="marathonPct" class="mar-pct">Kristin: --% &nbsp;&nbsp; Aaron: --%</span>
-    </h2>
+    <div class="prog-header">
+      <h2 id="mar-title" style="margin:0">Marathon Shape (last 30 days)</h2>
+      <div id="marathonPct" class="mar-pct">Kristin: --% &nbsp;&nbsp; Aaron: --%</div>
+    </div>
+
     <canvas id="marathonChart" role="img" aria-label="Marathon shape chart"></canvas>
+
+    <!-- Prognosis table -->
+    <table id="prognosisTable" class="prog-table" aria-label="Prognosis predictions">
+      <thead>
+        <tr><th>Distance</th><th>Kristin (time / pace)</th><th>Aaron (time / pace)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="3" style="text-align:center;color:#666">Loading prognosis…</td></tr>
+      </tbody>
+    </table>
   </section>
 
 <script>
 /*
   Minimal dynamic page:
   - Fixed users: kristin and aaron.
-  - Shows latest marathon shape percentages next to the Marathon Shape title.
-  - Loads JSON from data/<user>_vo2.json and data/<user>_marathon.json and plots the last 30 days.
+  - Loads JSON from data/<user>_vo2.json, data/<user>_marathon.json and data/<user>_prognosis.json
+  - Renders VO2 & marathon charts (last 30 days) and a Prognosis table (distance / time / pace for each user).
 */
 
 const errorsEl = document.getElementById('errors');
 const statusEl = document.getElementById('status'); // kept for accessibility but hidden visually
 const marPctEl = document.getElementById('marathonPct');
+const progTbody = document.querySelector('#prognosisTable tbody');
 
 function showError(msg){ errorsEl.textContent = msg || ''; if(msg) console.error(msg); }
 function showStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
@@ -88,7 +109,6 @@ function isoToDateKey(iso){
 function getLastNDates(n){
   const out = [];
   const now = new Date();
-  // Use UTC day boundaries to build consistent YYYY-MM-DD keys
   for(let i = n-1; i >= 0; i--){
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     d.setUTCDate(d.getUTCDate() - i);
@@ -145,7 +165,6 @@ function createOrUpdateChart(ctx, data, options, existing){
   return new Chart(ctx, { type:'line', data, options });
 }
 
-// fixed users (top stripped)
 const userA = 'kristin';
 const userB = 'aaron';
 
@@ -154,15 +173,16 @@ let marathonChart = null;
 
 async function loadAndRender(){
   errorsEl.textContent = '';
-  // status is hidden visually; still set for accessibility if needed
   showStatus('Loading…');
 
   try{
-    const [vo2Ajson, vo2Bjson, marAjson, marBjson] = await Promise.all([
+    const [vo2Ajson, vo2Bjson, marAjson, marBjson, progAjson, progBjson] = await Promise.all([
       fetchJSON(`data/${userA}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
       fetchJSON(`data/${userB}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
       fetchJSON(`data/${userA}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
-      fetchJSON(`data/${userB}_marathon.json`).catch(e=>{ showError(e.message); return null; })
+      fetchJSON(`data/${userB}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
+      fetchJSON(`data/${userA}_prognosis.json`).catch(e=>{ /* no prognosis yet */ return null; }),
+      fetchJSON(`data/${userB}_prognosis.json`).catch(e=>{ /* no prognosis yet */ return null; })
     ]);
 
     const vo2Amap = vo2ToMap(vo2Ajson);
@@ -180,23 +200,11 @@ async function loadAndRender(){
     const latestMarA = findLatestValue(marAmap);
     const latestMarB = findLatestValue(marBmap);
 
-    // set the percent badge next to Marathon Shape title
     const pA = latestMarA ? Math.round(latestMarA.value * 100) + '%' : '--%';
     const pB = latestMarB ? Math.round(latestMarB.value * 100) + '%' : '--%';
-    // Capitalize names for display
     const nameA = userA.charAt(0).toUpperCase() + userA.slice(1);
     const nameB = userB.charAt(0).toUpperCase() + userB.slice(1);
     marPctEl.textContent = `${nameA}: ${pA}   ${nameB}: ${pB}`;
-
-    // update hidden status line with concise info (kept hidden)
-    const latestVo2A = findLatestValue(vo2Amap);
-    const latestVo2B = findLatestValue(vo2Bmap);
-    const parts = [];
-    if(latestMarA) parts.push(`${nameA} marathon: ${latestMarA.value} (${latestMarA.date})`);
-    if(latestMarB) parts.push(`${nameB} marathon: ${latestMarB.value} (${latestMarB.date})`);
-    if(latestVo2A) parts.push(`${nameA} VO₂: ${latestVo2A.value} (${latestVo2A.date})`);
-    if(latestVo2B) parts.push(`${nameB} VO₂: ${latestVo2B.value} (${latestVo2B.date})`);
-    showStatus(parts.join('  |  '));
 
     // build chart payloads
     const vo2Data = {
@@ -224,6 +232,9 @@ async function loadAndRender(){
     vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Opts, vo2Chart);
     marathonChart = createOrUpdateChart(marCtx, marData, marOpts, marathonChart);
 
+    // Render prognosis table
+    renderPrognosisTable(progAjson, progBjson);
+
     // Clear any error text
     showError('');
 
@@ -233,7 +244,50 @@ async function loadAndRender(){
   }
 }
 
-// initial load
+function renderPrognosisTable(progA, progB){
+  // progA/progB are arrays of entries or null
+  const aEntries = Array.isArray(progA) ? progA : [];
+  const bEntries = Array.isArray(progB) ? progB : [];
+
+  // Build a union of distance_label keys (use label if present, else distance_mi)
+  const keys = new Map();
+  aEntries.forEach(e => {
+    const key = e.distance_label || String(e.distance_mi) + ' mi';
+    keys.set(key, key);
+  });
+  bEntries.forEach(e => {
+    const key = e.distance_label || String(e.distance_mi) + ' mi';
+    keys.set(key, key);
+  });
+
+  // If no prognosis found, show a friendly message
+  if(keys.size === 0){
+    progTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#666">No prognosis data available (run workflow or fetch manually).</td></tr>';
+    return;
+  }
+
+  // Sort keys by numeric distance when possible
+  const sortedKeys = Array.from(keys.keys()).sort((A,B)=>{
+    const numA = parseFloat(A.replace(',', '.').replace(/[^\d\.]/g,'')) || 0;
+    const numB = parseFloat(B.replace(',', '.').replace(/[^\d\.]/g,'')) || 0;
+    return numA - numB;
+  });
+
+  // map distance_label -> entry
+  const amap = new Map(aEntries.map(e => [(e.distance_label || String(e.distance_mi) + ' mi'), e]));
+  const bmap = new Map(bEntries.map(e => [(e.distance_label || String(e.distance_mi) + ' mi'), e]));
+
+  const rows = sortedKeys.map(k => {
+    const a = amap.get(k);
+    const b = bmap.get(k);
+    const aText = a ? `${a.time || '-'}  (${a.pace || '-'})` : '-';
+    const bText = b ? `${b.time || '-'}  (${b.pace || '-'})` : '-';
+    return `<tr><td>${k}</td><td>${aText}</td><td>${bText}</td></tr>`;
+  });
+
+  progTbody.innerHTML = rows.join('\n');
+}
+
 window.addEventListener('load', loadAndRender);
 </script>
 </body>
