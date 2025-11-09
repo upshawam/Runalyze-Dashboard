@@ -19,14 +19,13 @@ const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
 const isMarathonGoal = r => { if(!r) return false; if(typeof r.required_pct==='number' && r.required_pct===100) return true; if(typeof r.requiredPct==='number' && r.requiredPct===100) return true; if(Array.isArray(r) && r.length===0) return false; return false; };
 
-// new helper: format an ISO timestamp into America/Chicago (Central Time) using Intl.DateTimeFormat
+// format an ISO timestamp into America/Chicago (Central Time) in 24-hour form and try to include short zone (CST/CDT)
 // falls back to the raw ISO string on error
 function formatToCST(iso) {
   if(!iso) return '';
   try {
     const d = new Date(iso);
     if (isNaN(d)) return iso;
-    // Use en-US formatting; adjust options as you prefer
     const fmt = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/Chicago',
       year: 'numeric',
@@ -34,12 +33,41 @@ function formatToCST(iso) {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short'
     });
+    // result typically: "Nov 09, 2025, 13:48:52 CDT" (if the environment provides "CDT"/"CST")
     return fmt.format(d);
   } catch (e) {
     return iso;
   }
+}
+
+// human-friendly elapsed time (returns e.g. "3 minutes ago", "2 hours ago", "1 day 3 hours ago")
+function elapsedSince(iso) {
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  let diff = Math.floor((Date.now() - d.getTime()) / 1000); // seconds
+  if (diff < 0) diff = 0;
+  const days = Math.floor(diff / 86400);
+  diff -= days * 86400;
+  const hours = Math.floor(diff / 3600);
+  diff -= hours * 3600;
+  const minutes = Math.floor(diff / 60);
+  const seconds = diff - minutes * 60;
+
+  if (days > 0) {
+    return days === 1 ? `1 day ${hours}h ago` : `${days} days ${hours}h ago`;
+  }
+  if (hours > 0) {
+    return hours === 1 ? `1 hour ${minutes}m ago` : `${hours} hours ${minutes}m ago`;
+  }
+  if (minutes > 0) {
+    return minutes === 1 ? `1 minute ago` : `${minutes} minutes ago`;
+  }
+  return `${seconds} second${seconds===1 ? '' : 's'} ago`;
 }
 
 /* draw VO2 */
@@ -199,8 +227,7 @@ async function loadAndRender(){
         if(userBlock){
           const metaDiv = document.createElement('div');
           metaDiv.className = 'user-meta';
-          metaDiv.textContent = `Last updated: ${formatToCST(lastUpdated)} (CT)`;
-          // right-align meta by default via existing CSS user-meta rules
+          metaDiv.textContent = `Last updated: ${formatToCST(lastUpdated)} — ${elapsedSince(lastUpdated)}`;
           userBlock.appendChild(metaDiv);
         }
       }
