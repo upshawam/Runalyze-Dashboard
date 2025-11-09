@@ -1,72 +1,62 @@
-name: Fetch Runalyze data and publish to GitHub Pages
+name: Fetch Runalyze data and publish
 
-# run daily at midnight UTC and allow manual runs
 on:
+  # Run 4x/day (every 6 hours)
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
-          pip install playwright
-          # install browsers (headless)
-          playwright install --with-deps
+          pip install playwright==1.40.0 || pip install playwright
+          # install browsers for Playwright
+          python -m playwright install chromium
 
-      - name: Prepare storage files from secrets
-        env:
-          STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
-          STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
+      - name: Write storage_state files from secrets
+        # Expect secrets STORAGE_KRISTIN and STORAGE_AARON containing storage_state JSON
         run: |
-          mkdir -p tmp
-          if [ -n "$STORAGE_KRISTIN" ]; then
-            echo "Writing storage_kristin.json"
-            echo "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json
-          else
-            echo "STORAGE_KRISTIN secret not set"
+          if [ -n "${{ secrets.STORAGE_KRISTIN }}" ]; then
+            echo "${{ secrets.STORAGE_KRISTIN }}" > storage_kristin.json
           fi
-          if [ -n "$STORAGE_AARON" ]; then
-            echo "Writing storage_aaron.json"
-            echo "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json
-          else
-            echo "STORAGE_AARON secret not set"
+          if [ -n "${{ secrets.STORAGE_AARON }}" ]; then
+            echo "${{ secrets.STORAGE_AARON }}" > storage_aaron.json
           fi
 
-      - name: Run fetch script for each account
-        env:
-          PYTHONUNBUFFERED: 1
+      - name: Fetch data for Kristin
+        if: ${{ secrets.STORAGE_KRISTIN != '' }}
         run: |
-          mkdir -p docs/data
-          # call the script inside the scripts/ directory
-          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
-          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
-          ls -la docs/data || true
+          python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin || true
 
-      - name: Commit and push updated docs
-        env:
-          GIT_COMMITTER_NAME: "github-actions[bot]"
-          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Fetch data for Aaron
+        if: ${{ secrets.STORAGE_AARON != '' }}
         run: |
-          git config user.name "${GIT_COMMITTER_NAME}"
-          git config user.email "${GIT_COMMITTER_EMAIL}"
+          python scripts/play_fetch_runalyze.py fetch --storage storage_aaron.json --user aaron || true
+
+      - name: Commit and push updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data || true
-          git commit -m "ci: update runalyze data (automated)" || echo "No changes to commit"
-          git push
+          if git diff --cached --quiet; then
+            echo "No data changes to commit"
+          else
+            git commit -m "chore(data): update Runalyze JSON data"
+            git push
+          fi
