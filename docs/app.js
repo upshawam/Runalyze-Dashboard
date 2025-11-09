@@ -13,11 +13,34 @@ const fetchJSON = async p => {
 };
 const isoToKey = iso => { const d=new Date(iso); if(isNaN(d)) return null; return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; };
 const lastNDates = n => { const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())); d.setUTCDate(d.getUTCDate()-i); out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`); } return out; };
-const vo2Map = v => { if(!v) return {}; if(v.trend && typeof v.trend==='object') return v.trend; if(Array.isArray(v.values)) return v.values.reduce((m,it)=>{ const k=isoToKey(it[0]); if(k) m[k]=it[1]; return m; },{}); return (typeof v==='object')?v:{}; };
+const vo2Map = v => { if(!v) return {}; if(v.trend && typeof v.trend==='object') return v.trend; if(Array.isArray(v.values)) return v.values.reduce((m,it)=>{ const k=isoToKey(it[0]); if(k) m[k]=it[1]; return m; },{}); return {}; };
 const findLatest = m => { const keys=Object.keys(m).sort(); for(let i=keys.length-1;i>=0;i--){ const v=m[keys[i]]; if(v!=null && !isNaN(Number(v))) return {date:keys[i], value:Number(v)}; } return null; };
 const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi');
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
-const isMarathonGoal = r => { if(!r) return false; if(typeof r.required_pct==='number' && r.required_pct===100) return true; if(typeof r.requiredPct==='number' && r.requiredPct===100) return true; if(typeof r.distance_mi==='number' && Math.abs(r.distance_mi-26.2)<0.2) return true; if(typeof r.mi==='number' && Math.abs(r.mi-26.2)<0.2) return true; const lbl=(r.distance_label||r.label||'').toString(); return /\b26[.,]?2\b/.test(lbl) || /\b26\b/.test(lbl); };
+const isMarathonGoal = r => { if(!r) return false; if(typeof r.required_pct==='number' && r.required_pct===100) return true; if(typeof r.requiredPct==='number' && r.requiredPct===100) return true; if(Array.isArray(r) && r.length===0) return false; return false; };
+
+// new helper: format an ISO timestamp into America/Chicago (Central Time) using Intl.DateTimeFormat
+// falls back to the raw ISO string on error
+function formatToCST(iso) {
+  if(!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    // Use en-US formatting; adjust options as you prefer
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    return fmt.format(d);
+  } catch (e) {
+    return iso;
+  }
+}
 
 /* draw VO2 */
 let vo2Chart = null;
@@ -72,7 +95,7 @@ async function loadAndRender(){
         }
       }
 
-      const header = `<div class="user-block user-${u}"><div><div class="user-title">${u[0].toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct!==null ? (Math.round(currentPct*100)/100) : 'N/A'}</div></div>${ lastUpdated ? `<div class="user-meta">Last updated: ${fmtTs(lastUpdated)}</div>` : '' }</div>`;
+      const header = `<div class="user-block user-${u}"><div><div class="user-title">${u[0].toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct!==null ? (Math.round(currentPct*100)/100) : '-'}</div></div></div>`;
 
       // rows: parsed or fallback
       const req = d.requirements;
@@ -169,6 +192,19 @@ async function loadAndRender(){
       const wrapper = document.createElement('div');
       wrapper.className = `user-table user-${u}`;
       wrapper.innerHTML = tableHtml;
+
+      // Append a "Last updated" string in Central Time (America/Chicago) if we found a _meta timestamp.
+      if(lastUpdated){
+        const userBlock = wrapper.querySelector('.user-block');
+        if(userBlock){
+          const metaDiv = document.createElement('div');
+          metaDiv.className = 'user-meta';
+          metaDiv.textContent = `Last updated: ${formatToCST(lastUpdated)} (CT)`;
+          // right-align meta by default via existing CSS user-meta rules
+          userBlock.appendChild(metaDiv);
+        }
+      }
+
       tablesEl.appendChild(wrapper);
     });
 
