@@ -9,15 +9,18 @@
     #controls { margin-bottom: 12px; }
     canvas { max-width: 1000px; margin-bottom: 28px; }
     .note { color: #666; font-size: 0.9rem; margin-bottom:8px; }
+    .error { color: #b00; font-weight: 600; }
   </style>
 </head>
 <body>
   <h1>Runalyze Dashboard (static)</h1>
-  <div class="note">If charts are empty, confirm the JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
+  <div class="note">If charts are empty, confirm the JSON files exist at <code>/docs/data/&lt;user&gt;_marathon.json</code> and <code>/docs/data/&lt;user&gt;_vo2.json</code>.</div>
+
   <div id="controls">
     <label>User A: <input id="userA" value="kristin"></label>
     <label>User B: <input id="userB" value="aaron"></label>
     <button onclick="refresh()">Refresh</button>
+    <span id="status" style="margin-left:12px;color:#666"></span>
   </div>
 
   <h2>Marathon shape</h2>
@@ -26,7 +29,12 @@
   <h2>VO2max (trend)</h2>
   <canvas id="chartVo2" height="120"></canvas>
 
+  <div id="errors" style="margin-top:12px;"></div>
+
   <script>
+    const statusEl = document.getElementById('status');
+    const errorsEl = document.getElementById('errors');
+
     const ctxM = document.getElementById('chartMarathon').getContext('2d');
     const ctxV = document.getElementById('chartVo2').getContext('2d');
 
@@ -48,40 +56,79 @@
     async function fetchJSON(path) {
       try {
         const r = await fetch(path + '?t=' + Date.now());
-        if (!r.ok) return null;
+        if (!r.ok) {
+          const text = await r.text().catch(()=>'');
+          throw new Error(`${r.status} ${r.statusText} - ${text.slice(0,200)}`);
+        }
         return await r.json();
       } catch (e) {
-        console.error('fetch error', e);
-        return null;
+        throw new Error(`Fetch ${path} failed: ${e.message}`);
       }
     }
 
     function trendToPoints(trendObj) {
       if (!trendObj) return [];
       const obj = trendObj.data || trendObj.trend || trendObj;
-      const entries = Object.entries(obj).map(([d, v]) => ({ x: d, y: v }));
-      entries.sort((a,b) => a.x.localeCompare(b.x));
-      return entries;
+      try {
+        const entries = Object.entries(obj).map(([d, v]) => ({ x: d, y: v }));
+        entries.sort((a,b) => a.x.localeCompare(b.x));
+        return entries;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function showStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function showError(msg) {
+      const el = document.createElement('div');
+      el.className = 'error';
+      el.textContent = msg;
+      errorsEl.appendChild(el);
+      console.error(msg);
     }
 
     async function refresh() {
-      const a = document.getElementById('userA').value || 'kristin';
-      const b = document.getElementById('userB').value || 'aaron';
+      errorsEl.innerHTML = '';
+      showStatus('Loading…');
+      const a = document.getElementById('userA').value.trim() || 'kristin';
+      const b = document.getElementById('userB').value.trim() || 'aaron';
 
-      // NOTE: use "data/..." because docs/ is the site root on GitHub Pages when publishing from docs/
-      const mA = await fetchJSON(`data/${a}_marathon.json`);
-      const mB = await fetchJSON(`data/${b}_marathon.json`);
-      chartM.data.datasets = [];
-      if (mA) chartM.data.datasets.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
-      if (mB) chartM.data.datasets.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
-      chartM.update();
+      // Use /docs/data path as requested
+      const mAPath = `/docs/data/${a}_marathon.json`;
+      const mBPath = `/docs/data/${b}_marathon.json`;
+      const vAPath = `/docs/data/${a}_vo2.json`;
+      const vBPath = `/docs/data/${b}_vo2.json`;
 
-      const vA = await fetchJSON(`data/${a}_vo2.json`);
-      const vB = await fetchJSON(`data/${b}_vo2.json`);
-      chartV.data.datasets = [];
-      if (vA && vA.trend) chartV.data.datasets.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
-      if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
-      chartV.update();
+      try {
+        const [mA, mB, vA, vB] = await Promise.all([
+          fetchJSON(mAPath).catch(err => { showError(err.message); return null; }),
+          fetchJSON(mBPath).catch(err => { showError(err.message); return null; }),
+          fetchJSON(vAPath).catch(err => { showError(err.message); return null; }),
+          fetchJSON(vBPath).catch(err => { showError(err.message); return null; }),
+        ]);
+
+        chartM.data.datasets = [];
+        if (mA) chartM.data.datasets.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
+        if (mB) chartM.data.datasets.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
+        chartM.update();
+
+        chartV.data.datasets = [];
+        if (vA && vA.trend) chartV.data.datasets.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
+        if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
+        chartV.update();
+
+        if ((!mA && !mB) && (!vA && !vB)) {
+          showStatus('No data found for selected users.');
+        } else {
+          showStatus('Loaded');
+        }
+      } catch (e) {
+        showError('Unexpected error: ' + e.message);
+        showStatus('Error');
+      }
     }
 
     // initial load
