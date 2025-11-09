@@ -12,6 +12,8 @@ This script:
  - fetches the Marathon Shape page HTML and parses the requirements table (including "Optimum")
    and writes it to docs/data/<user>_marathon_requirements.json.
 
+It now also records a UTC last-updated timestamp into each generated JSON under the "_meta.last_updated" key.
+
 Usage:
   python scripts/play_fetch_runalyze.py login --storage storage_kristin.json
   python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin
@@ -36,6 +38,9 @@ MARATHON_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/maratho
 VO2_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/vo2max/{from_ts}/{to_ts}"
 PROG_URL = "https://runalyze.com/plugin/RunalyzePluginPanel_Prognose/window.plot.php"
 MAR_SHAPE_PAGE = "https://runalyze.com/my/marathon-shape"
+
+def utc_now_iso():
+    return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
 def interactive_login(storage_path: str, browser_type: str = "chromium"):
     storage_path = Path(storage_path)
@@ -286,6 +291,10 @@ def fetch_prognosis(storage_state_path: str, user_label: str):
             browser.close()
 
     parsed = parse_prognosis_html(text)
+    # add last-updated meta
+    if isinstance(parsed, dict):
+        parsed.setdefault('_meta', {})
+        parsed['_meta']['last_updated'] = utc_now_iso()
     out = DATA_DIR / f"{user_label}_prognosis.json"
     out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
     # write raw html for debugging
@@ -310,11 +319,28 @@ def fetch_marathon_requirements(storage_state_path: str, user_label: str):
             browser.close()
 
     parsed = parse_marathon_requirements_html(text)
+    # add last-updated meta
+    if isinstance(parsed, dict):
+        parsed.setdefault('_meta', {})
+        parsed['_meta']['last_updated'] = utc_now_iso()
     out = DATA_DIR / f"{user_label}_marathon_requirements.json"
     out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
     raw_html_out = DATA_DIR / f"{user_label}_marathon_requirements.html"
     raw_html_out.write_text(text, encoding="utf-8")
     return parsed
+
+def write_json_with_meta(path: Path, content):
+    """
+    Ensure we add a safe _meta.last_updated field without disturbing content.
+    If content is a dict, insert _meta; otherwise wrap.
+    """
+    if isinstance(content, dict):
+        content.setdefault('_meta', {})
+        content['_meta']['last_updated'] = utc_now_iso()
+        path.write_text(json.dumps(content, indent=2), encoding="utf-8")
+    else:
+        wrapper = {"value": content, "_meta": {"last_updated": utc_now_iso()}}
+        path.write_text(json.dumps(wrapper, indent=2), encoding="utf-8")
 
 def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_date="2025-11-08"):
     user_label = user_label.replace(" ", "_").lower()
@@ -328,13 +354,14 @@ def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_dat
     print(f"[{user_label}] Fetching marathon-shape (internal JSON): {marathon_url}")
     marathon_json = fetch_with_storage(str(storage_path), marathon_url)
     marathon_out = DATA_DIR / f"{user_label}_marathon.json"
-    marathon_out.write_text(json.dumps(marathon_json, indent=2), encoding="utf-8")
+    # add _meta.last_updated safely
+    write_json_with_meta(marathon_out, marathon_json)
     print(f"[{user_label}] Wrote {marathon_out}")
 
     print(f"[{user_label}] Fetching vo2max: {vo2_url}")
     vo2_json = fetch_with_storage(str(storage_path), vo2_url)
     vo2_out = DATA_DIR / f"{user_label}_vo2.json"
-    vo2_out.write_text(json.dumps(vo2_json, indent=2), encoding="utf-8")
+    write_json_with_meta(vo2_out, vo2_json)
     print(f"[{user_label}] Wrote {vo2_out}")
 
     print(f"[{user_label}] Fetching prognosis panel: {PROG_URL}")
