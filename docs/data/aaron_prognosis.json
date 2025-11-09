@@ -1,1 +1,38 @@
-[]
+{
+  "meta": {
+    "login_detected": false,
+    "found": true
+  },
+  "entries": [
+    {
+      "distance_label": "1,86&nbsp;mi",
+      "distance_mi": 1.86,
+      "time": "Fatigue",
+      "pace": "from"
+    },
+    {
+      "distance_label": "3,11&nbsp;mi",
+      "distance_mi": 3.11,
+      "time": "22:44",
+      "pace": "7:19/mi"
+    },
+    {
+      "distance_label": "6,21&nbsp;mi",
+      "distance_mi": 6.21,
+      "time": "47:09",
+      "pace": "7:35/mi"
+    },
+    {
+      "distance_label": "13,11&nbsp;mi",
+      "distance_mi": 13.11,
+      "time": "1:44:33",
+      "pace": "7:58/mi"
+    },
+    {
+      "distance_label": "26,22&nbsp;mi",
+      "distance_mi": 26.22,
+      "time": "4:05:27",
+      "pace": "9:22/mi"
+    }
+  ]
+}
