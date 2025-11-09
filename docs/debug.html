@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Runalyze Data Debug</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:24px; }
+    .user { border:1px solid #eee; padding:12px; margin:12px 0; border-radius:6px; max-width:640px; }
+    .label { font-weight:600; }
+    .value { font-size:1.25rem; color:#111; margin-top:6px; }
+    .note { color:#666; font-size:0.9rem; margin-bottom:12px; }
+    button { margin-top:8px; }
+  </style>
+</head>
+<body>
+  <h1>Runalyze Data - Quick Check</h1>
+  <div class="note">This page fetches the JSON files the workflow writes and shows the latest VO2 and marathon-shape values (no charts).</div>
+
+  <div id="results"></div>
+
+  <button id="reload">Reload</button>
+
+  <script>
+    const results = document.getElementById('results');
+    const users = ['kristin','aaron'];
+
+    function parseLatestFromMap(obj) {
+      // obj is { "YYYY-MM-DD": number, ... }
+      if (!obj || typeof obj !== 'object') return null;
+      const entries = Object.entries(obj).filter(([k,v]) => v !== null && v !== undefined && !Number.isNaN(Number(v)));
+      if (entries.length === 0) return null;
+      entries.sort((a,b)=> Date.parse(a[0]) - Date.parse(b[0]));
+      const [date, value] = entries[entries.length-1];
+      return { date, value };
+    }
+
+    function parseLatestFromTrend(trendObj) {
+      // trendObj similar to above; return latest non-null value
+      return parseLatestFromMap(trendObj);
+    }
+
+    async function fetchJson(path) {
+      try {
+        const r = await fetch(path + '?t=' + Date.now());
+        if (!r.ok) return { error: `${r.status} ${r.statusText}` };
+        return await r.json();
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+
+    async function show() {
+      results.innerHTML = '';
+      for (const u of users) {
+        const container = document.createElement('div');
+        container.className = 'user';
+        container.innerHTML = `<div class="label">${u}</div>
+          <div id="${u}-vo2" class="value">VO2: loading…</div>
+          <div id="${u}-mar" class="value">Marathon shape: loading…</div>`;
+        results.appendChild(container);
+
+        // fetch vo2
+        const vo2 = await fetchJson(`data/${u}_vo2.json`);
+        if (vo2.error) {
+          document.getElementById(`${u}-vo2`).textContent = `VO2: error fetching (${vo2.error})`;
+        } else {
+          const latest = parseLatestFromTrend(vo2.trend || vo2);
+          if (latest) document.getElementById(`${u}-vo2`).textContent = `VO2 (latest ${latest.date}): ${latest.value}`;
+          else document.getElementById(`${u}-vo2`).textContent = `VO2: no numeric trend values found`;
+        }
+
+        // fetch marathon
+        const mar = await fetchJson(`data/${u}_marathon.json`);
+        if (mar.error) {
+          document.getElementById(`${u}-mar`).textContent = `Marathon: error fetching (${mar.error})`;
+        } else {
+          const latest = parseLatestFromMap(mar);
+          if (latest) document.getElementById(`${u}-mar`).textContent = `Marathon-shape (latest ${latest.date}): ${latest.value}`;
+          else document.getElementById(`${u}-mar`).textContent = `Marathon-shape: no numeric values found`;
+        }
+      }
+    }
+
+    document.getElementById('reload').addEventListener('click', show);
+
+    // initial load
+    show();
+  </script>
+</body>
+</html>
