@@ -1,5 +1,6 @@
-// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (with Optimum and last-updated display).
-// This reads the new _meta.last_updated field when present and displays it in the per-user header.
+// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user
+// Minor visual changes: use Font Awesome icons to match Runalyze table and tighten spacing.
+// Display _meta.last_updated from marathon JSON (if present).
 
 const ERR_EL = document.getElementById('errors') || { textContent: '' };
 const TABLES_EL = document.getElementById('tables');
@@ -133,6 +134,12 @@ function formatTimestamp(ts){
   }
 }
 
+/* helper to ensure "3,1 mi" becomes "3,1&nbsp;mi" for non-breaking */
+function nbspMi(text){
+  if(!text || typeof text !== 'string') return text;
+  return text.replace(/(\d[\d,\.]*)\s*mi/gi, '$1&nbsp;mi');
+}
+
 async function loadAndRender(){
   showError('');
   try{
@@ -214,38 +221,41 @@ async function loadAndRender(){
       if(req && Array.isArray(req.entries) && req.entries.length){
         // use parsed requirements JSON from Runalyze page (preferred)
         for(const r of req.entries){
-          const label = r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-');
+          let label = r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-');
+          label = nbspMi(label);
           const required = (r.required_pct !== null && r.required_pct !== undefined) ? `${r.required_pct}%` : '-';
-          const weekly = r.weekly || '-';
-          const longRun = r.long_run || '-';
+          const weekly = nbspMi(r.weekly || '-');
+          const longRun = nbspMi(r.long_run || '-');
           const achievedNum = (r.achieved_pct !== null && r.achieved_pct !== undefined) ? `${r.achieved_pct}%` : '-';
-          const iconHtml = r.achieved_ok ? `<span class="plus">✔</span>` : `<span class="minus">✖</span>`;
+          const iconHtml = r.achieved_ok ? `<i class="fa-solid fa-check plus" aria-hidden="true"></i>` : `<i class="fa-solid fa-xmark minus" aria-hidden="true"></i>`;
           const progTime = r.prognosis_time || '-';
           let optimumText = '-';
-          // show optimum only if achieved_pct < 100 (per your earlier request)
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
-          rowsHtml += `<tr class="r">
-            <td class="b right-separated">${label}</td>
+          rowsHtml += `<tr class="r ${r.required_pct === 100 ? 'top-separated bottom-separated' : ''}">
+            <td class="b right-separated nowrap-mi">${label}</td>
             <td>${required}</td>
             <td>${weekly}</td>
             <td class="right-separated">${longRun}</td>
-            <td>${achievedNum}</td>
+            <td>
+              ${achievedNum}
+            </td>
             <td>${iconHtml}</td>
-            <td class="left-separated small hidden-mobile">${progTime}</td>
+            <td class="left-separated hidden-mobile">${progTime}</td>
             <td class="hidden-mobile">${optimumText}</td>
           </tr>`;
         }
       } else {
         // fallback: derive from default RUNALYZE_ROWS and prognosis data
         for(const r of RUNALYZE_ROWS){
+          const label = nbspMi(r.label);
           let achievedText = '-';
-          let achievedIcon = `<span class="minus">✖</span>`;
+          let achievedIcon = `<i class="fa-solid fa-xmark minus" aria-hidden="true"></i>`;
           if(currentPct !== null && r.requiredPct){
             const achievedNum = Math.round((currentPct / r.requiredPct) * 100);
             achievedText = `${achievedNum}%`;
-            if(achievedNum >= 100) achievedIcon = `<span class="plus">✔</span>`;
+            if(achievedNum >= 100) achievedIcon = `<i class="fa-solid fa-check plus" aria-hidden="true"></i>`;
           }
           let progText = '-';
           if(prog){
@@ -256,13 +266,13 @@ async function loadAndRender(){
           const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
 
           rowsHtml += `<tr class="r">
-            <td class="b right-separated">${r.label}</td>
+            <td class="b right-separated nowrap-mi">${label}</td>
             <td>${r.requiredPct}%</td>
             <td>${r.weekly}</td>
             <td class="right-separated">${r.longRun}</td>
             <td>${achievedText}</td>
             <td>${achievedIcon}</td>
-            <td class="left-separated small hidden-mobile">${progText}</td>
+            <td class="left-separated hidden-mobile">${progText}</td>
             <td class="hidden-mobile">${optimumText}</td>
           </tr>`;
         }
