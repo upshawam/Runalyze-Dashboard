@@ -26,28 +26,59 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install playwright==1.40.0 || pip install playwright
-          # install browsers for Playwright
           python -m playwright install chromium
 
-      - name: Write storage_state files from secrets
-        # Expect secrets STORAGE_KRISTIN and STORAGE_AARON containing storage_state JSON
+      - name: Write storage_state files from secrets (if present)
         run: |
           if [ -n "${{ secrets.STORAGE_KRISTIN }}" ]; then
             echo "${{ secrets.STORAGE_KRISTIN }}" > storage_kristin.json
+            echo "Wrote storage_kristin.json"
+          else
+            echo "STORAGE_KRISTIN secret not set; skipping kristin"
           fi
           if [ -n "${{ secrets.STORAGE_AARON }}" ]; then
             echo "${{ secrets.STORAGE_AARON }}" > storage_aaron.json
+            echo "Wrote storage_aaron.json"
+          else
+            echo "STORAGE_AARON secret not set; skipping aaron"
           fi
 
-      - name: Fetch data for Kristin
-        if: ${{ secrets.STORAGE_KRISTIN != '' }}
+      - name: Fetch data in parallel (Kristin & Aaron)
         run: |
-          python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin || true
+          set -euo pipefail
+          # start kristin fetch if storage exists
+          if [ -f storage_kristin.json ]; then
+            echo "Starting kristin fetch..."
+            (python scripts/play_fetch_runalyze.py fetch --storage storage_kristin.json --user kristin > kristin_fetch.log 2>&1) &
+            P1=$!
+          else
+            P1=""
+            echo "No storage_kristin.json; skipping kristin"
+          fi
 
-      - name: Fetch data for Aaron
-        if: ${{ secrets.STORAGE_AARON != '' }}
-        run: |
-          python scripts/play_fetch_runalyze.py fetch --storage storage_aaron.json --user aaron || true
+          # start aaron fetch if storage exists
+          if [ -f storage_aaron.json ]; then
+            echo "Starting aaron fetch..."
+            (python scripts/play_fetch_runalyze.py fetch --storage storage_aaron.json --user aaron > aaron_fetch.log 2>&1) &
+            P2=$!
+          else
+            P2=""
+            echo "No storage_aaron.json; skipping aaron"
+          fi
+
+          # Wait for background jobs if they were started
+          if [ -n "${P1:-}" ]; then
+            echo "Waiting for kristin (PID $P1)..."
+            wait $P1 || echo "kristin fetch exited with non-zero"
+            echo "Kristin fetch finished. Log:"
+            tail -n +1 kristin_fetch.log || true
+          fi
+          if [ -n "${P2:-}" ]; then
+            echo "Waiting for aaron (PID $P2)..."
+            wait $P2 || echo "aaron fetch exited with non-zero"
+            echo "Aaron fetch finished. Log:"
+            tail -n +1 aaron_fetch.log || true
+          fi
 
       - name: Commit and push updated data
         run: |
