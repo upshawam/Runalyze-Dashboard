@@ -11,38 +11,45 @@
   <style>
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-      margin: 24px;
+      margin: 20px;
       background: #fafafa;
       color: #111;
     }
 
-    .page-title { font-size:1.25rem; font-weight:700; margin-bottom:8px; }
-    .note { color:#666; font-size:0.95rem; margin-bottom:18px; }
+    .page-title { font-size:1.1rem; font-weight:700; margin-bottom:8px; }
+    .note { color:#666; font-size:0.95rem; margin-bottom:14px; }
 
-    .chart-wrap { max-width:1200px; margin:28px auto; }
-    canvas { width:100% !important; height:380px !important; display:block; background: #fff; border-radius:6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .chart-wrap { max-width:1200px; margin:20px auto; }
+    canvas { width:100% !important; height:360px !important; display:block; background: #fff; border-radius:6px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 
     h2 { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:0 0 12px 0; }
     .mar-pct { font-size:0.95rem; color:#222; font-weight:700; }
-    .status { display: none; } /* hidden as requested */
+    .status { display: none; } /* hidden visually but kept for accessibility if needed */
     .error { color:#b00; font-weight:700; margin-top:8px; text-align:center; }
+
+    /* marathon header / progress */
+    .prog-header { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1200px; margin:0 auto 8px; }
+    .progress-wrap { display:flex; align-items:center; gap:8px; }
+    .progress-bar-outer { width:220px; background:#eee; border-radius:6px; height:10px; overflow:hidden; position:relative; }
+    .progress-bar-inner { height:100%; width:0%; background:linear-gradient(90deg,#2e86de,#2ec4b6); transition: width 400ms ease; }
+    .progress-over { position:absolute; right:6px; top:-18px; font-size:12px; color:#2e86de; display:none; }
 
     /* prognosis table */
     .prog-table { width:100%; max-width:800px; margin:10px auto 0; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
     .prog-table th, .prog-table td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left; }
     .prog-table th { background:#f6f8fb; font-weight:700; }
-    .prog-header { display:flex; justify-content:space-between; align-items:center; gap:12px; max-width:1200px; margin:0 auto; }
 
     @media (max-width:700px) {
       canvas { height:300px !important; }
       h2 { flex-direction:column; align-items:flex-start; gap:6px; }
       .prog-table th, .prog-table td { padding:6px 8px; }
+      .progress-bar-outer { width:160px; }
     }
   </style>
 </head>
 <body>
-  <div class="page-title">VO₂ Max & Marathon Shape (static)</div>
-  <div class="note">Displaying the last 30 days. Data is loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json.</div>
+  <div class="page-title">VO₂ Max & Marathon Shape</div>
+  <div class="note">Displays the last 30 days. Data loaded from data/&lt;user&gt;_vo2.json, data/&lt;user&gt;_marathon.json and data/&lt;user&gt;_prognosis.json (workflow).</div>
 
   <div id="errors" class="error" aria-live="polite"></div>
   <div id="status" class="status" aria-live="polite"></div>
@@ -53,14 +60,29 @@
   </section>
 
   <section class="chart-wrap" aria-labelledby="mar-title">
+    <!-- Marathon header with percent badge, progress bar and projection -->
     <div class="prog-header">
       <h2 id="mar-title" style="margin:0">Marathon Shape (last 30 days)</h2>
-      <div id="marathonPct" class="mar-pct">Kristin: --% &nbsp;&nbsp; Aaron: --%</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div id="marathonPct" class="mar-pct">Kristin: --% &nbsp;&nbsp; Aaron: --%</div>
+
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:0.85rem;color:#666;">Progress</div>
+          <div style="position:relative;">
+            <div class="progress-bar-outer" aria-hidden="true">
+              <div id="marProgressBar" class="progress-bar-inner"></div>
+              <div id="marOverflow" class="progress-over">+0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="marProjection" style="font-size:0.85rem;color:#444;text-align:right;">Projected: --</div>
+      </div>
     </div>
 
     <canvas id="marathonChart" role="img" aria-label="Marathon shape chart"></canvas>
 
-    <!-- Prognosis table: show 5k, 10k, Half, Full with time and pace -->
+    <!-- Prognosis table -->
     <table id="prognosisTable" class="prog-table" aria-label="Prognosis predictions">
       <thead>
         <tr><th>Distance</th><th>Kristin (time / pace)</th><th>Aaron (time / pace)</th></tr>
@@ -71,238 +93,6 @@
     </table>
   </section>
 
-<script>
-/*
-  Loads JSON from data/<user>_vo2.json, data/<user>_marathon.json and data/<user>_prognosis.json,
-  renders charts and a prognosis table listing 5k, 10k, half, full with time and pace.
-*/
-
-const errorsEl = document.getElementById('errors');
-const statusEl = document.getElementById('status'); // hidden visually
-const marPctEl = document.getElementById('marathonPct');
-const progTbody = document.querySelector('#prognosisTable tbody');
-
-function showError(msg){ errorsEl.textContent = msg || ''; if(msg) console.error(msg); }
-function showStatus(msg){ if(statusEl) statusEl.textContent = msg || ''; }
-
-async function fetchJSON(path){
-  try{
-    const r = await fetch(path + '?t=' + Date.now());
-    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    return await r.json();
-  }catch(e){
-    throw new Error(`Fetch ${path} failed: ${e.message}`);
-  }
-}
-
-function isoToDateKey(iso){
-  const d = new Date(iso);
-  if(Number.isNaN(d.getTime())) return null;
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth()+1).padStart(2,'0');
-  const day = String(d.getUTCDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
-
-function getLastNDates(n){
-  const out = [];
-  const now = new Date();
-  for(let i = n-1; i >= 0; i--){
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    d.setUTCDate(d.getUTCDate() - i);
-    const key = d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
-    out.push(key);
-  }
-  return out;
-}
-
-function vo2ToMap(vo2json){
-  if(!vo2json) return {};
-  if(vo2json.trend && typeof vo2json.trend === 'object') return vo2json.trend;
-  if(Array.isArray(vo2json.values)){
-    const m = {};
-    for(const it of vo2json.values){
-      if(!it || !it[0]) continue;
-      const k = isoToDateKey(it[0]);
-      if(k) m[k] = it[1];
-    }
-    return m;
-  }
-  if(typeof vo2json === 'object') return vo2json;
-  return {};
-}
-function marathonToMap(mjson){
-  if(!mjson) return {};
-  if(typeof mjson === 'object') return mjson;
-  return {};
-}
-function buildSeries(map, labels){
-  return labels.map(d => {
-    const v = map[d];
-    return (v === null || v === undefined) ? null : Number(v);
-  });
-}
-function findLatestValue(map){
-  const keys = Object.keys(map).sort();
-  for(let i = keys.length-1; i >=0; i--){
-    const k = keys[i];
-    const v = map[k];
-    if(v !== null && v !== undefined && !Number.isNaN(Number(v))) return { date: k, value: Number(v) };
-  }
-  return null;
-}
-
-function createOrUpdateChart(ctx, data, options, existing){
-  if(existing){
-    existing.data = data;
-    existing.options = options || existing.options;
-    existing.resize();
-    existing.update();
-    return existing;
-  }
-  return new Chart(ctx, { type:'line', data, options });
-}
-
-const userA = 'kristin';
-const userB = 'aaron';
-
-let vo2Chart = null;
-let marathonChart = null;
-
-async function loadAndRender(){
-  errorsEl.textContent = '';
-  showStatus('Loading…');
-
-  try{
-    const [vo2Ajson, vo2Bjson, marAjson, marBjson, progAjson, progBjson] = await Promise.all([
-      fetchJSON(`data/${userA}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
-      fetchJSON(`data/${userB}_vo2.json`).catch(e=>{ showError(e.message); return null; }),
-      fetchJSON(`data/${userA}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
-      fetchJSON(`data/${userB}_marathon.json`).catch(e=>{ showError(e.message); return null; }),
-      fetchJSON(`data/${userA}_prognosis.json`).catch(e=>{ /* no prognosis yet */ return null; }),
-      fetchJSON(`data/${userB}_prognosis.json`).catch(e=>{ /* no prognosis yet */ return null; })
-    ]);
-
-    const vo2Amap = vo2ToMap(vo2Ajson);
-    const vo2Bmap = vo2ToMap(vo2Bjson);
-    const marAmap = marathonToMap(marAjson);
-    const marBmap = marathonToMap(marBjson);
-
-    const last30 = getLastNDates(30);
-
-    const vo2ASeries = buildSeries(vo2Amap, last30);
-    const vo2BSeries = buildSeries(vo2Bmap, last30);
-    const marASeries = buildSeries(marAmap, last30);
-    const marBSeries = buildSeries(marBmap, last30);
-
-    const latestMarA = findLatestValue(marAmap);
-    const latestMarB = findLatestValue(marBmap);
-
-    const pA = latestMarA ? Math.round(latestMarA.value * 100) + '%' : '--%';
-    const pB = latestMarB ? Math.round(latestMarB.value * 100) + '%' : '--%';
-    const nameA = userA.charAt(0).toUpperCase() + userA.slice(1);
-    const nameB = userB.charAt(0).toUpperCase() + userB.slice(1);
-    marPctEl.textContent = `${nameA}: ${pA}   ${nameB}: ${pB}`;
-
-    // build chart payloads
-    const vo2Data = {
-      labels: last30,
-      datasets: [
-        { label: `${nameA} VO₂`, data: vo2ASeries, borderColor:'rgba(75,192,192,1)', backgroundColor:'rgba(75,192,192,0.12)', tension:0.25, pointRadius:3, spanGaps:true },
-        { label: `${nameB} VO₂`, data: vo2BSeries, borderColor:'rgba(255,99,132,1)', backgroundColor:'rgba(255,99,132,0.12)', tension:0.25, pointRadius:3, spanGaps:true }
-      ]
-    };
-    const vo2Opts = { responsive:true, plugins:{legend:{display:true}}, scales:{ x:{ type:'category' }, y:{ beginAtZero:false } }, maintainAspectRatio:false };
-
-    const marData = {
-      labels: last30,
-      datasets: [
-        { label: `${nameA} marathon`, data: marASeries, borderColor:'rgba(20,115,220,1)', backgroundColor:'rgba(20,115,220,0.10)', tension:0.2, pointRadius:3, spanGaps:true },
-        { label: `${nameB} marathon`, data: marBSeries, borderColor:'rgba(255,140,0,1)', backgroundColor:'rgba(255,140,0,0.10)', tension:0.2, pointRadius:3, spanGaps:true }
-      ]
-    };
-    const marOpts = { responsive:true, plugins:{legend:{display:true}}, scales:{ x:{ type:'category' }, y:{ beginAtZero:false } }, maintainAspectRatio:false };
-
-    // render or update
-    const vo2Ctx = document.getElementById('vo2Chart').getContext('2d');
-    const marCtx = document.getElementById('marathonChart').getContext('2d');
-
-    vo2Chart = createOrUpdateChart(vo2Ctx, vo2Data, vo2Opts, vo2Chart);
-    marathonChart = createOrUpdateChart(marCtx, marData, marOpts, marathonChart);
-
-    // Render prognosis table but only for the standard target distances (5k, 10k, half, full)
-    renderPrognosisTable(progAjson, progBjson);
-
-    // Clear any error text
-    showError('');
-
-  }catch(e){
-    showError(e.message);
-    showStatus('');
-  }
-}
-
-/*
-  Render prognosis table specifically for these targets:
-    5k  -> ~3.11 mi
-    10k -> ~6.21 mi
-    Half Marathon -> ~13.11 mi
-    Marathon -> ~26.22 mi
-
-  We'll match by distance_mi if present (tolerance), otherwise fall back to distance_label string search.
-*/
-function renderPrognosisTable(progA, progB){
-  const aEntries = Array.isArray(progA && progA.entries ? progA.entries : progA) ? (progA.entries || progA) : [];
-  const bEntries = Array.isArray(progB && progB.entries ? progB.entries : progB) ? (progB.entries || progB) : [];
-
-  const targets = [
-    { id: '5k', mi: 3.11, label: '5k' },
-    { id: '10k', mi: 6.21, label: '10k' },
-    { id: 'half', mi: 13.11, label: 'Half' },
-    { id: 'full', mi: 26.22, label: 'Full' }
-  ];
-
-  // helper to find best match in an entries array for a target
-  function findMatch(entries, target){
-    if(!Array.isArray(entries)) return null;
-    // try numeric match by distance_mi within tolerance (0.25 mi)
-    const tol = 0.35;
-    let best = null;
-    for(const e of entries){
-      if(e && typeof e.distance_mi === 'number'){
-        const diff = Math.abs(e.distance_mi - target.mi);
-        if(diff <= tol){
-          if(!best || diff < Math.abs(best.distance_mi - target.mi)) best = e;
-        }
-      }
-    }
-    if(best) return best;
-    // fallback: try to find by label substring (e.g., '5', '10', '13', '26' or 'mi')
-    const look = String(target.mi).split('.')[0]; // '3','6','13','26'
-    for(const e of entries){
-      if(!e) continue;
-      const lbl = (e.distance_label || '').toLowerCase().replace(/\u00a0/g,' ');
-      if(lbl.includes(String(target.mi)) || lbl.includes(look) || lbl.includes(target.id) ) return e;
-    }
-    // nothing found
-    return null;
-  }
-
-  // build rows for each target
-  const rows = targets.map(t => {
-    const a = findMatch(aEntries, t);
-    const b = findMatch(bEntries, t);
-    const aText = a ? `${a.time || '-'} / ${a.pace || '-'}` : '-';
-    const bText = b ? `${b.time || '-'} / ${b.pace || '-'}` : '-';
-    // friendly label
-    const friendly = (t.id === 'half') ? 'Half (13.1 mi)' : (t.id === 'full' ? 'Marathon (26.2 mi)' : t.id.toUpperCase());
-    return `<tr><td>${friendly}</td><td>${aText}</td><td>${bText}</td></tr>`;
-  });
-
-  progTbody.innerHTML = rows.join('\n');
-}
-
-window.addEventListener('load', loadAndRender);
-</script>
+  <script src="app.js"></script>
 </body>
 </html>
