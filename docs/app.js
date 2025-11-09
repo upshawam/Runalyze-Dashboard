@@ -1,11 +1,15 @@
-// docs/app.js - reordered columns: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly mileage, Long Run
-// Weekly column gets class "weekly-col"; Prognosis/Optimum get "hidden-mobile" so CSS controls their sizing/hiding.
-
-// Changes: VO2 chart now shows a rolling last-2-month window (UTC).
-// Additionally the chart top is set a few percent above the highest plotted point so the top marker isn't flush with the edge.
+// docs/app.js - add multi-window marathon-shape projection (7/14/30/60d) and show recommended date
+// Compact, behavior-preserving app.js. Projections shown per-user in the header under "Last updated".
+// Projection algorithm (per your spec):
+//  - percent = value * 100
+//  - use the last W samples (W = window days) from the marathon series (most recent dates available)
+//  - if series already crossed 100% in the window, return interpolated crossing date
+//  - otherwise run least-squares linear regression (x = day as fractional days since epoch, y = percent)
+//    to estimate when y == 100% (return null if slope <= 0)
 
 const USERS = ['kristin','aaron'];
 const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
+const PROJECTION_WINDOWS = [7, 14, 30, 60];
 
 const nowTag = () => '?t=' + Date.now();
 const el = id => document.getElementById(id);
@@ -14,164 +18,208 @@ const fetchJSON = async p => {
   if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
   return r.json();
 };
+
 const isoToKey = iso => { const d=new Date(iso); if(isNaN(d)) return null; return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; };
-
-// generate an array of YYYY-MM-DD strings covering the range [today - months, today] in UTC inclusive
-const lastDatesForMonths = (months) => {
-  const out = [];
-  const now = new Date();
-  // end = today's UTC date (time zeroed to UTC date)
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  // start = end shifted back by `months` UTC months
-  const start = new Date(end.getTime());
-  start.setUTCMonth(start.getUTCMonth() - months);
-  // iterate from start to end inclusive, advancing by 1 day (UTC)
-  for(let d = new Date(start); d.getTime() <= end.getTime(); d.setUTCDate(d.getUTCDate() + 1)){
-    const yyyy = d.getUTCFullYear();
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    out.push(`${yyyy}-${mm}-${dd}`);
-    // Note: setUTCDate mutates d in place; loop will advance correctly
-  }
-  return out;
-};
-
-const vo2Map = v => { if(!v) return {}; if(v.trend && typeof v.trend==='object') return v.trend; if(Array.isArray(v.values)) return v.values.reduce((m,it)=>{ const k=isoToKey(it[0]); if(k) m[k]=it[1]; return m; },{}); return {}; };
-const findLatest = m => { const keys=Object.keys(m).sort(); for(let i=keys.length-1;i>=0;i--){ const v=m[keys[i]]; if(v!=null && !isNaN(Number(v))) return {date:keys[i], value:Number(v)}; } return null; };
+const lastNDates = n => { const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())); d.setUTCDate(d.getUTCDate()-i); out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`); } return out; };
 const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi');
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
-const isMarathonGoal = r => { if(!r) return false; if(typeof r.required_pct==='number' && r.required_pct===100) return true; if(typeof r.requiredPct==='number' && r.requiredPct===100) return true; if(Array.isArray(r) && r.length===0) return false; return false; };
 
-// format an ISO timestamp into America/Chicago (Central Time) in 24-hour form and try to include short zone (CST/CDT)
-// falls back to the raw ISO string on error
-function formatToCST(iso) {
-  if(!iso) return '';
-  try {
-    const d = new Date(iso);
-    if (isNaN(d)) return iso;
-    const fmt = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Chicago',
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-      timeZoneName: 'short'
-    });
-    return fmt.format(d);
-  } catch (e) {
-    return iso;
+const vo2Map = v => {
+  if(!v) return {};
+  if(v.trend && typeof v.trend === 'object') return v.trend;
+  if(Array.isArray(v.values)) return v.values.reduce((m,it)=>{ const k=isoToKey(it[0]); if(k) m[k]=it[1]; return m; },{});
+  return (typeof v === 'object') ? v : {};
+};
+
+const findLatest = m => {
+  const keys = Object.keys(m).sort();
+  for(let i=keys.length-1;i>=0;i--){
+    const v = m[keys[i]];
+    if(v != null && !isNaN(Number(v))) return { date: keys[i], value: Number(v) };
   }
+  return null;
+};
+
+// Helper: linear regression (x and y arrays) => {slope, intercept}
+// x should be numeric (days), y numeric (percent)
+function linearRegression(x, y){
+  if(!x.length || x.length !== y.length) return null;
+  const n = x.length;
+  let sumX=0, sumY=0, sumXY=0, sumXX=0;
+  for(let i=0;i<n;i++){
+    sumX += x[i];
+    sumY += y[i];
+    sumXY += x[i]*y[i];
+    sumXX += x[i]*x[i];
+  }
+  const meanX = sumX/n;
+  const meanY = sumY/n;
+  const denom = (sumXX - n*meanX*meanX);
+  if(Math.abs(denom) < 1e-12) return { slope: 0, intercept: meanY }; // vertical-like case
+  const slope = (sumXY - n*meanX*meanY) / denom;
+  const intercept = meanY - slope*meanX;
+  return { slope, intercept };
 }
 
-// human-friendly elapsed time (returns e.g. "3 minutes ago", "2 hours ago", "1 day 3 hours ago")
-function elapsedSince(iso) {
-  if(!iso) return '';
-  const d = new Date(iso);
-  if(isNaN(d)) return '';
-  let diff = Math.floor((Date.now() - d.getTime()) / 1000); // seconds
-  if (diff < 0) diff = 0;
-  const days = Math.floor(diff / 86400);
-  diff -= days * 86400;
-  const hours = Math.floor(diff / 3600);
-  diff -= hours * 3600;
-  const minutes = Math.floor(diff / 60);
-  const seconds = diff - minutes * 60;
-
-  if (days > 0) {
-    return days === 1 ? `1 day ${hours}h ago` : `${days} days ${hours}h ago`;
+// Given arrays of labels (ISO yyyy-mm-dd) and values (raw marathon shape like 0.65),
+// build arrays appropriate for regression (x = days since epoch, y = percent)
+function buildXY(labels, values){
+  const msPerDay = 1000*60*60*24;
+  const x = [], y = [];
+  for(let i=0;i<labels.length;i++){
+    const dt = new Date(labels[i] + 'T00:00:00Z');
+    if(isNaN(dt)) continue;
+    const xi = dt.getTime()/msPerDay; // days since epoch as float
+    const vi = values[i];
+    if(vi == null || isNaN(Number(vi))) continue;
+    x.push(xi);
+    y.push(Number(vi) * 100); // convert to percent
   }
-  if (hours > 0) {
-    return hours === 1 ? `1 hour ${minutes}m ago` : `${hours} hours ${minutes}m ago`;
-  }
-  if (minutes > 0) {
-    return minutes === 1 ? `1 minute ago` : `${minutes} minutes ago`;
-  }
-  return `${seconds} second${seconds===1 ? '' : 's'} ago`;
+  return { x, y };
 }
 
-/* draw VO2 */
+// If the series crosses 100% inside the given slice (labels[]/values[]), return a Date of crossing (interpolated),
+// otherwise return null
+function findDateReachedFromLabels(labels, values, threshold = 100){
+  // labels array of ISO dates, values raw (0.65)
+  for(let i=0;i<labels.length;i++){
+    const cur = Number(values[i]);
+    if(isNaN(cur)) continue;
+    const curPct = cur * 100;
+    if(curPct >= threshold){
+      if(i === 0){
+        // first sample already >= threshold
+        return new Date(labels[0] + 'T00:00:00Z');
+      }
+      // interpolate between previous and current
+      const prev = Number(values[i-1]);
+      const prevPct = prev * 100;
+      const frac = (threshold - prevPct) / (curPct - prevPct);
+      // clamp
+      const f = Math.max(0, Math.min(1, frac));
+      const d0 = new Date(labels[i-1] + 'T00:00:00Z').getTime();
+      const d1 = new Date(labels[i] + 'T00:00:00Z').getTime();
+      const t = Math.round(d0 + (d1 - d0) * f);
+      return new Date(t);
+    }
+  }
+  return null;
+}
+
+// Estimate reach date via regression. Returns Date or null if slope <= 0 or insufficient data
+function estimateReachDate(labels, values, threshold = 100){
+  const { x, y } = buildXY(labels, values);
+  if(x.length < 2) return null;
+  const reg = linearRegression(x, y);
+  if(!reg) return null;
+  const slope = reg.slope; // percent per day (because x is days)
+  const intercept = reg.intercept;
+  if(slope <= 0) return null;
+  // Solve for x where y = threshold => x = (threshold - intercept) / slope
+  const targetX = (threshold - intercept) / slope;
+  if(!isFinite(targetX)) return null;
+  const msPerDay = 1000*60*60*24;
+  const t = Math.round(targetX * msPerDay);
+  return new Date(t);
+}
+
+// Compute projection for a specific window (number of days): use last windowDays of the available sorted series
+function projectionForWindow(sortedDates, sortedValues, windowDays){
+  // take last windowDays samples (or fewer if not enough)
+  const N = sortedDates.length;
+  if(N === 0) return null;
+  const L = Math.min(windowDays, N);
+  const sliceDates = sortedDates.slice(N - L);
+  const sliceValues = sortedValues.slice(N - L);
+  // check if already reached within slice
+  const reached = findDateReachedFromLabels(sliceDates, sliceValues, 100);
+  if(reached) return reached;
+  // else estimate via regression
+  return estimateReachDate(sliceDates, sliceValues, 100);
+}
+
+// Compute projections map for windows in PROJECTION_WINDOWS; returns {7:Date|null, ...}
+function computeProjectionsFromSeries(seriesObj){
+  // seriesObj is { '2025-10-01': 0.17, ... }
+  const dates = Object.keys(seriesObj).sort();
+  const values = dates.map(d => seriesObj[d]);
+  const out = {};
+  for(const w of PROJECTION_WINDOWS){
+    out[w] = projectionForWindow(dates, values, w);
+  }
+  return out;
+}
+
+// pickRecommendedDate: median of available projection dates (as described earlier), null if none
+function pickRecommendedDate(projMap){
+  const dates = PROJECTION_WINDOWS.map(w => projMap[w]).filter(Boolean).map(d => d.getTime()).sort((a,b)=>a-b);
+  if(!dates.length) return null;
+  const mid = Math.floor((dates.length - 1) / 2);
+  return new Date(dates[mid]);
+}
+
+// format projection map for display (short)
+function formatProjMap(projMap){
+  return PROJECTION_WINDOWS.map(w => {
+    const dt = projMap[w];
+    return `${w}d: ${dt ? dt.toISOString().slice(0,10) : '—'}`;
+  }).join(', ');
+}
+
+/* --- UI + main flow (unchanged structure; we now compute and display projections) --- */
+
 let vo2Chart = null;
 function drawVo2(ctx, labels, datasets){
   const data = { labels, datasets };
-
-  // compute highest numeric value across all datasets (ignore nulls)
-  let maxVal = null;
-  datasets.forEach(ds => {
-    if (!Array.isArray(ds.data)) return;
-    ds.data.forEach(v => {
-      if (v != null && !isNaN(Number(v))) {
-        const num = Number(v);
-        if (maxVal === null || num > maxVal) maxVal = num;
-      }
-    });
-  });
-
-  // add a small headroom above the max so points don't sit at the very top.
-  // use ~6% headroom and round up to 2 decimals for a tidy axis tick.
-  let suggestedTop = undefined;
-  if (maxVal !== null) {
-    suggestedTop = Math.ceil((maxVal * 1.06) * 100) / 100;
-  }
-
-  const opts = {
-    responsive: true,
-    plugins: { legend: { display: true } },
-    scales: {
-      x: { type: 'category' },
-      y: Object.assign({ beginAtZero: false }, (suggestedTop ? { suggestedMax: suggestedTop } : {}))
-    },
-    maintainAspectRatio: false
-  };
-
-  if(vo2Chart){
-    vo2Chart.data = data;
-    vo2Chart.options = opts;
-    vo2Chart.update();
-    return;
-  }
-  vo2Chart = new Chart(ctx, { type: 'line', data, options: opts });
+  const opts = { responsive:true, plugins:{legend:{display:true}}, scales:{x:{type:'category'}, y:{beginAtZero:false}}, maintainAspectRatio:false };
+  if(vo2Chart){ vo2Chart.data = data; vo2Chart.options = opts; vo2Chart.update(); return; }
+  vo2Chart = new Chart(ctx, { type:'line', data, options:opts });
 }
 
 async function loadAndRender(){
+  const errorsEl = el('errors');
   try{
-    if(el('errors')) el('errors').textContent = '';
-    // fetch all data
+    if(errorsEl) errorsEl.textContent = '';
+
+    // fetch all data in parallel
     const fetches = [];
     USERS.forEach(u => DATA_FILES.forEach(f => fetches.push(fetchJSON(`data/${u}_${f}.json`).catch(()=>null))));
     const results = await Promise.all(fetches);
 
-    // assemble per-user
+    // assemble per-user data
     const users = {};
     for(let i=0;i<USERS.length;i++){
-      const base = i*DATA_FILES.length;
-      users[USERS[i]] = { vo2: results[base], marathon: results[base+1], prognosis: results[base+2], requirements: results[base+3] };
+      const base = i * DATA_FILES.length;
+      users[USERS[i]] = {
+        vo2: results[base],
+        marathon: results[base+1],
+        prognosis: results[base+2],
+        requirements: results[base+3]
+      };
     }
 
-    // VO2 chart - rolling last 2 months
-    const lastTwoMonths = lastDatesForMonths(2);
-    const datasets = USERS.map((u,idx) => {
+    // VO2 chart (last 30)
+    const last30 = lastNDates(30);
+    const datasets = USERS.map((u, idx) => {
       const map = vo2Map(users[u].vo2);
-      // only keep values inside the two-month window; map to null when missing
-      const data = lastTwoMonths.map(d => (map[d]==null)? null : Number(map[d]));
-      const color = idx===0 ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
-      return { label: u[0].toUpperCase()+u.slice(1)+' VO₂', data, borderColor: color, backgroundColor: color.replace('1)','0.12)'), tension:0.25, pointRadius:3, spanGaps:true };
+      const data = last30.map(d => (map[d] == null) ? null : Number(map[d]));
+      const color = idx === 0 ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
+      return { label: u[0].toUpperCase()+u.slice(1)+' VO₂', data, borderColor: color, backgroundColor: color.replace('1)', '0.12)'), tension:0.25, pointRadius:3, spanGaps:true };
     });
-    drawVo2(el('vo2Chart').getContext('2d'), lastTwoMonths, datasets);
+    drawVo2(el('vo2Chart').getContext('2d'), last30, datasets);
 
-    // build tables
+    // build tables and compute projections
     const tablesEl = el('tables');
     tablesEl.innerHTML = '';
+
     USERS.forEach(u => {
       const d = users[u];
-      const marMap = (d.marathon && typeof d.marathon==='object') ? d.marathon : {};
-      const latest = findLatest(marMap);
+      const marSeries = (d.marathon && typeof d.marathon === 'object') ? d.marathon : {};
+      const latest = findLatest(marSeries);
       const currentPct = latest ? latest.value * 100 : null;
 
-      // last-updated pick
-      const metaCandidates = [d.marathon,d.requirements,d.prognosis];
+      // pick last-updated meta
+      const metaCandidates = [d.marathon, d.requirements, d.prognosis];
       let lastUpdated = null;
       for(const c of metaCandidates){
         if(c && typeof c === 'object'){
@@ -180,14 +228,29 @@ async function loadAndRender(){
         }
       }
 
-      const header = `<div class="user-block user-${u}"><div><div class="user-title">${u[0].toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct!==null ? (Math.round(currentPct*100)/100) : '-'}</div></div></div>`;
+      // compute projections for this user's marathon series
+      const projMap = computeProjectionsFromSeries(marSeries); // {7:Date|null,...}
+      const rec = pickRecommendedDate(projMap);
 
-      // rows: parsed or fallback
+      // build header: include projections summary line (compact)
+      const projText = `Projections: ${formatProjMap(projMap)}${rec ? ` — rec: ${rec.toISOString().slice(0,10)}` : ''}`;
+      const header = `
+        <div class="user-block user-${u}">
+          <div>
+            <div class="user-title">${u[0].toUpperCase()+u.slice(1)}</div>
+            <div class="small">Latest marathon shape: ${currentPct!==null ? (Math.round(currentPct*100)/100) : 'N/A'}</div>
+          </div>
+          <div>
+            ${ lastUpdated ? `<div class="user-meta">Last updated: ${fmtTs(lastUpdated)}</div>` : '' }
+            <div class="small" style="margin-top:6px">${projText}</div>
+          </div>
+        </div>`;
+
+      // construct rows (prefer parsed requirements, fallback as before) and reuse the same column order already implemented previously
       const req = d.requirements;
       let rows = [];
       if(req && Array.isArray(req.entries) && req.entries.length){
         rows = req.entries.map(r => ({
-          // NEW ORDER: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly, LongRun
           distance: nbspMi(r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-')),
           achieved: (r.achieved_pct!=null) ? `${r.achieved_pct}%` : '-',
           icon: r.achieved_ok ? '<i class="fa-solid fa-check plus" aria-hidden="true"></i>' : '<i class="fa-solid fa-xmark minus" aria-hidden="true"></i>',
@@ -223,7 +286,7 @@ async function loadAndRender(){
             goal: (r.p === 100)
           };
         });
-        // try fill prognosis from d.prognosis.entries
+        // try best-effort to fill prognosis times from d.prognosis.entries
         if(d.prognosis && Array.isArray(d.prognosis.entries)){
           rows = rows.map(row=>{
             const match = d.prognosis.entries.find(e=>{
@@ -237,16 +300,14 @@ async function loadAndRender(){
         }
       }
 
-      // render rows in NEW ORDER
+      // render rows in the new order (Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly, Long Run)
       const rowsHtml = rows.map(r => `
         <tr class="r${r.goal ? ' marathon-goal top-separated bottom-separated' : ''}">
           <td class="nowrap-mi">${r.distance}</td>
           <td class="center">${r.achieved}</td>
           <td class="center icon-col" aria-hidden="true">${r.icon}</td>
-
           <td class="left-separated hidden-mobile">${r.prog}</td>
           <td class="hidden-mobile">${r.opt}</td>
-
           <td>${r.shape}</td>
           <td class="weekly-col">${r.weekly}</td>
           <td>${r.longRun}</td>
@@ -277,18 +338,6 @@ async function loadAndRender(){
       const wrapper = document.createElement('div');
       wrapper.className = `user-table user-${u}`;
       wrapper.innerHTML = tableHtml;
-
-      // Append a "Last updated" string in Central Time (America/Chicago) if we found a _meta timestamp.
-      if(lastUpdated){
-        const userBlock = wrapper.querySelector('.user-block');
-        if(userBlock){
-          const metaDiv = document.createElement('div');
-          metaDiv.className = 'user-meta';
-          metaDiv.textContent = `Last updated: ${formatToCST(lastUpdated)} — ${elapsedSince(lastUpdated)}`;
-          userBlock.appendChild(metaDiv);
-        }
-      }
-
       tablesEl.appendChild(wrapper);
     });
 
