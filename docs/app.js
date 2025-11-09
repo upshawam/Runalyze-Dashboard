@@ -1,11 +1,11 @@
-// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (with Optimum support).
-// This version adds per-user wrapper classes so CSS can shade Kristin (purple) and Aaron (green).
+// app.js - VO2 chart + Runalyze-style Marathon Shape tables per user (with Optimum and last-updated display).
+// This reads the new _meta.last_updated field when present and displays it in the per-user header.
 
-const ERR_EL = document.getElementById('errors');
+const ERR_EL = document.getElementById('errors') || { textContent: '' };
 const TABLES_EL = document.getElementById('tables');
 
 function showError(msg){
-  ERR_EL.textContent = msg || '';
+  if (ERR_EL) ERR_EL.textContent = msg || '';
   if(msg) console.error(msg);
 }
 
@@ -122,6 +122,17 @@ function findPrognosisEntry(entries, targetMi, tol = 0.35){
   return null;
 }
 
+function formatTimestamp(ts){
+  if(!ts) return '';
+  try{
+    const d = new Date(ts);
+    if(Number.isNaN(d.getTime())) return ts;
+    return d.toISOString().slice(0,19).replace('T',' ');
+  }catch(e){
+    return ts;
+  }
+}
+
 async function loadAndRender(){
   showError('');
   try{
@@ -170,7 +181,21 @@ async function loadAndRender(){
       const req = data.requirements;
       const latest = findLatestValue(marMap);
       const currentPct = latest ? (latest.value * 100) : null;
-      const userTitle = `<div class="user-block"><div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct !== null ? (currentPct.toFixed(1)+'%') : 'N/A'} ${latest ? '('+latest.date+')' : ''}</div></div>`;
+
+      // show last-updated timestamp from requirements JSON if available; fallback to prognosis _meta
+      let lastUpdated = null;
+      if(req && typeof req === 'object'){
+        if(req._meta && req._meta.last_updated) lastUpdated = req._meta.last_updated;
+        else if(req.meta && req.meta.last_updated) lastUpdated = req.meta.last_updated;
+      }
+      if(!lastUpdated && prog && typeof prog === 'object'){
+        if(prog._meta && prog._meta.last_updated) lastUpdated = prog._meta.last_updated;
+        else if(prog.meta && prog.meta.last_updated) lastUpdated = prog.meta.last_updated;
+      }
+
+      const lastUpdatedText = lastUpdated ? `<div class="small">Last updated: ${formatTimestamp(lastUpdated)}</div>` : '';
+
+      const userHeader = `<div class="user-block user-${u}"><div class="user-title">${u.charAt(0).toUpperCase()+u.slice(1)}</div><div class="small">Latest marathon shape: ${currentPct !== null ? (currentPct.toFixed(1)+'%') : 'N/A'} ${latest ? '('+latest.date+')' : ''}${lastUpdatedText}</div></div>`;
 
       // Build rows HTML
       let rowsHtml = '';
@@ -185,7 +210,7 @@ async function loadAndRender(){
           const iconHtml = r.achieved_ok ? `<span class="plus">✔</span>` : `<span class="minus">✖</span>`;
           const progTime = r.prognosis_time || '-';
           let optimumText = '-';
-          // show optimum only if achieved_pct < 100 (per your request)
+          // show optimum only if achieved_pct < 100 (per your earlier request)
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
@@ -257,11 +282,9 @@ async function loadAndRender(){
         </table>
       `;
 
-      // wrapper with per-user class so CSS can style columns by user
       const wrapper = document.createElement('div');
       wrapper.className = `user-table user-${u}`;
-      // add a header/title + the table
-      wrapper.innerHTML = userTitle + tableHtml;
+      wrapper.innerHTML = userHeader + tableHtml;
       TABLES_EL.appendChild(wrapper);
     }
   }catch(err){
