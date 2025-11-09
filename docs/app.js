@@ -1,6 +1,9 @@
 // docs/app.js - reordered columns: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly mileage, Long Run
 // Weekly column gets class "weekly-col"; Prognosis/Optimum get "hidden-mobile" so CSS controls their sizing/hiding.
 
+// Changes: VO2 chart now shows a rolling last-2-month window (UTC). It computes the date range
+// from today back two months and plots only those dates (dropping older data).
+
 const USERS = ['kristin','aaron'];
 const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
 
@@ -12,7 +15,27 @@ const fetchJSON = async p => {
   return r.json();
 };
 const isoToKey = iso => { const d=new Date(iso); if(isNaN(d)) return null; return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; };
-const lastNDates = n => { const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())); d.setUTCDate(d.getUTCDate()-i); out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`); } return out; };
+
+// generate an array of YYYY-MM-DD strings covering the range [today - months, today] in UTC inclusive
+const lastDatesForMonths = (months) => {
+  const out = [];
+  const now = new Date();
+  // end = today's UTC date (time zeroed to UTC date)
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // start = end shifted back by `months` UTC months
+  const start = new Date(end.getTime());
+  start.setUTCMonth(start.getUTCMonth() - months);
+  // iterate from start to end inclusive, advancing by 1 day (UTC)
+  for(let d = new Date(start); d.getTime() <= end.getTime(); d.setUTCDate(d.getUTCDate() + 1)){
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    out.push(`${yyyy}-${mm}-${dd}`);
+    // Note: setUTCDate mutates d in place; loop will advance correctly
+  }
+  return out;
+};
+
 const vo2Map = v => { if(!v) return {}; if(v.trend && typeof v.trend==='object') return v.trend; if(Array.isArray(v.values)) return v.values.reduce((m,it)=>{ const k=isoToKey(it[0]); if(k) m[k]=it[1]; return m; },{}); return {}; };
 const findLatest = m => { const keys=Object.keys(m).sort(); for(let i=keys.length-1;i>=0;i--){ const v=m[keys[i]]; if(v!=null && !isNaN(Number(v))) return {date:keys[i], value:Number(v)}; } return null; };
 const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi');
@@ -37,7 +60,6 @@ function formatToCST(iso) {
       hour12: false,
       timeZoneName: 'short'
     });
-    // result typically: "Nov 09, 2025, 13:48:52 CDT" (if the environment provides "CDT"/"CST")
     return fmt.format(d);
   } catch (e) {
     return iso;
@@ -94,15 +116,16 @@ async function loadAndRender(){
       users[USERS[i]] = { vo2: results[base], marathon: results[base+1], prognosis: results[base+2], requirements: results[base+3] };
     }
 
-    // VO2 chart
-    const last30 = lastNDates(30);
+    // VO2 chart - rolling last 2 months
+    const lastTwoMonths = lastDatesForMonths(2);
     const datasets = USERS.map((u,idx) => {
       const map = vo2Map(users[u].vo2);
-      const data = last30.map(d => (map[d]==null)? null : Number(map[d]));
+      // only keep values inside the two-month window; map to null when missing
+      const data = lastTwoMonths.map(d => (map[d]==null)? null : Number(map[d]));
       const color = idx===0 ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
       return { label: u[0].toUpperCase()+u.slice(1)+' VO₂', data, borderColor: color, backgroundColor: color.replace('1)','0.12)'), tension:0.25, pointRadius:3, spanGaps:true };
     });
-    drawVo2(el('vo2Chart').getContext('2d'), last30, datasets);
+    drawVo2(el('vo2Chart').getContext('2d'), lastTwoMonths, datasets);
 
     // build tables
     const tablesEl = el('tables');
