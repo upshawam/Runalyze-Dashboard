@@ -28,11 +28,33 @@
     .small { font-size:0.9rem; color:#666; }
 
     .user-block { max-width:1200px; margin: 8px auto 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+
+    /* Subtle per-user column shading:
+       Kristin -> light purple, Aaron -> light green
+       Shade Distance (col 1) and Achieved (col 5) columns for visual emphasis.
+    */
+    .user-kristin .rz-table tbody td:nth-child(1),
+    .user-kristin .rz-table tbody td:nth-child(5),
+    .user-kristin .rz-table thead th:nth-child(1),
+    .user-kristin .rz-table thead th:nth-child(5) {
+      background: rgba(153,102,255,0.06);
+    }
+    .user-aaron .rz-table tbody td:nth-child(1),
+    .user-aaron .rz-table tbody td:nth-child(5),
+    .user-aaron .rz-table thead th:nth-child(1),
+    .user-aaron .rz-table thead th:nth-child(5) {
+      background: rgba(40,180,99,0.06);
+    }
+
+    /* small responsive tweak */
+    @media (max-width:900px){
+      .rz-table { width:100%; }
+    }
   </style>
 </head>
 <body>
   <div class="page-title">VO₂ Max & Marathon Shape</div>
-  <div class="note">Displays VO₂ trend and Runalyze-style Marathon Shape table per user. Data loaded from docs/data/<user>_*.json.</div>
+  <div class="note">Displays VO₂ trend and Runalyze-style Marathon Shape table per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
 
   <div id="errors" style="color:#b00;font-weight:700"></div>
 
