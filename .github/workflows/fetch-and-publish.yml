@@ -1,7 +1,6 @@
 name: Fetch Runalyze data and publish to GitHub Pages
 
 on:
-  # run at midnight daily (change to '0 */6 * * *' for 4x/day)
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
@@ -12,7 +11,6 @@ permissions:
 jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,71 +27,83 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt || true
           pip install playwright
-          python -m playwright install chromium
+          playwright install --with-deps
 
-      - name: Prepare/validate storage_kristin.json (if secret present)
+      - name: Prepare storage files from secrets (safe: base64 or raw)
+        env:
+          STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
+          STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
         run: |
+          set -euo pipefail
           mkdir -p tmp
-          if [ -n "${{ secrets.STORAGE_KRISTIN }}" ]; then
-            printf '%s' "${{ secrets.STORAGE_KRISTIN }}" > tmp/storage_kristin.json
-            echo "Wrote tmp/storage_kristin.json (size=$(wc -c < tmp/storage_kristin.json) bytes)"
-            python -c "import json,sys; json.load(open('tmp/storage_kristin.json')); print('kristin JSON OK')" || (echo "ERROR: kristin storage is not valid JSON" && exit 2)
+
+          if [ -n "${STORAGE_KRISTIN:-}" ]; then
+            printf '%s' "$STORAGE_KRISTIN" > tmp/_raw_kristin.txt
+            if printf '%s' "$(cat tmp/_raw_kristin.txt)" | base64 --decode > tmp/storage_kristin.json 2>/dev/null; then
+              # If decode produced something invalid we'll detect below
+              echo "kristin: attempted base64 decode -> tmp/storage_kristin.json"
+            else
+              echo "kristin: not base64, writing raw JSON -> tmp/storage_kristin.json"
+              cp tmp/_raw_kristin.txt tmp/storage_kristin.json
+            fi
+            python -c "import json,sys
+try:
+  json.load(open('tmp/storage_kristin.json','r',encoding='utf-8'))
+  print('kristin storage: valid JSON')
+except Exception as e:
+  print('kristin storage: INVALID JSON ->', e); sys.exit(2)
+"
           else
             echo "STORAGE_KRISTIN not set; skipping kristin"
           fi
 
-      - name: Prepare/validate storage_aaron.json (if secret present)
-        run: |
-          mkdir -p tmp
-          if [ -n "${{ secrets.STORAGE_AARON }}" ]; then
-            printf '%s' "${{ secrets.STORAGE_AARON }}" > tmp/storage_aaron.json
-            echo "Wrote tmp/storage_aaron.json (size=$(wc -c < tmp/storage_aaron.json) bytes)"
-            python -c "import json,sys; json.load(open('tmp/storage_aaron.json')); print('aaron JSON OK')" || (echo "ERROR: aaron storage is not valid JSON" && exit 2)
+          if [ -n "${STORAGE_AARON:-}" ]; then
+            printf '%s' "$STORAGE_AARON" > tmp/_raw_aaron.txt
+            if printf '%s' "$(cat tmp/_raw_aaron.txt)" | base64 --decode > tmp/storage_aaron.json 2>/dev/null; then
+              echo "aaron: attempted base64 decode -> tmp/storage_aaron.json"
+            else
+              echo "aaron: not base64, writing raw JSON -> tmp/storage_aaron.json"
+              cp tmp/_raw_aaron.txt tmp/storage_aaron.json
+            fi
+            python -c "import json,sys
+try:
+  json.load(open('tmp/storage_aaron.json','r',encoding='utf-8'))
+  print('aaron storage: valid JSON')
+except Exception as e:
+  print('aaron storage: INVALID JSON ->', e); sys.exit(2)
+"
           else
             echo "STORAGE_AARON not set; skipping aaron"
           fi
 
-      - name: Run fetch for kristin (if present)
+      - name: Run fetch script for each account
+        env:
+          PYTHONUNBUFFERED: 1
         run: |
           mkdir -p docs/data
           if [ -f tmp/storage_kristin.json ]; then
-            echo "Running fetch for kristin..."
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || (echo "kristin fetch failed"; exit 1)
+            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
           else
             echo "No tmp/storage_kristin.json; skipped kristin"
           fi
-
-      - name: Run fetch for aaron (if present)
-        run: |
-          mkdir -p docs/data
           if [ -f tmp/storage_aaron.json ]; then
-            echo "Running fetch for aaron..."
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json --user aaron --from-date 2025-08-10 --to-date 2025-11-08 || (echo "aaron fetch failed"; exit 1)
+            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json --user aaron --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
           else
             echo "No tmp/storage_aaron.json; skipped aaron"
           fi
-
-      - name: Show produced data files (quick)
-        run: |
           ls -la docs/data || true
-          for f in docs/data/*_*.json; do
-            echo "==== $f ===="
-            python -c "import json,sys; j=json.load(open('$f')); print(j.get('_meta') or j.get('meta') or {})" || echo "Could not parse $f"
-          done
 
-      - name: Commit and push updated docs/data (use PAT if available)
+      - name: Commit and push updated docs (use PAT)
         env:
+          GIT_COMMITTER_NAME: "github-actions[bot]"
+          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
           ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "${GIT_COMMITTER_NAME}"
+          git config user.email "${GIT_COMMITTER_EMAIL}"
           git add docs/data || true
-          if git diff --cached --quiet; then
-            echo "No data changes to commit"
-          else
-            git commit -m "ci: update runalyze data (automated)"
-            if [ -n "${ACTIONS_PAT:-}" ]; then
-              git remote set-url origin "https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}.git"
-            fi
-            git push origin HEAD:main
+          git commit -m "ci: update runalyze data (automated)" || echo "No changes to commit"
+          if [ -n "${ACTIONS_PAT:-}" ]; then
+            git remote set-url origin https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}.git
           fi
+          git push origin HEAD:main
