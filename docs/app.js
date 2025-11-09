@@ -1,8 +1,8 @@
 // docs/app.js - reordered columns: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly mileage, Long Run
 // Weekly column gets class "weekly-col"; Prognosis/Optimum get "hidden-mobile" so CSS controls their sizing/hiding.
 
-// Changes: VO2 chart now shows a rolling last-2-month window (UTC). It computes the date range
-// from today back two months and plots only those dates (dropping older data).
+// Changes: VO2 chart now shows a rolling last-2-month window (UTC).
+// Additionally the chart top is set a few percent above the highest plotted point so the top marker isn't flush with the edge.
 
 const USERS = ['kristin','aaron'];
 const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
@@ -96,9 +96,43 @@ function elapsedSince(iso) {
 let vo2Chart = null;
 function drawVo2(ctx, labels, datasets){
   const data = { labels, datasets };
-  const opts = { responsive:true, plugins:{legend:{display:true}}, scales:{x:{type:'category'}, y:{beginAtZero:false}}, maintainAspectRatio:false };
-  if(vo2Chart){ vo2Chart.data=data; vo2Chart.options=opts; vo2Chart.update(); return; }
-  vo2Chart = new Chart(ctx, { type:'line', data, options:opts });
+
+  // compute highest numeric value across all datasets (ignore nulls)
+  let maxVal = null;
+  datasets.forEach(ds => {
+    if (!Array.isArray(ds.data)) return;
+    ds.data.forEach(v => {
+      if (v != null && !isNaN(Number(v))) {
+        const num = Number(v);
+        if (maxVal === null || num > maxVal) maxVal = num;
+      }
+    });
+  });
+
+  // add a small headroom above the max so points don't sit at the very top.
+  // use ~6% headroom and round up to 2 decimals for a tidy axis tick.
+  let suggestedTop = undefined;
+  if (maxVal !== null) {
+    suggestedTop = Math.ceil((maxVal * 1.06) * 100) / 100;
+  }
+
+  const opts = {
+    responsive: true,
+    plugins: { legend: { display: true } },
+    scales: {
+      x: { type: 'category' },
+      y: Object.assign({ beginAtZero: false }, (suggestedTop ? { suggestedMax: suggestedTop } : {}))
+    },
+    maintainAspectRatio: false
+  };
+
+  if(vo2Chart){
+    vo2Chart.data = data;
+    vo2Chart.options = opts;
+    vo2Chart.update();
+    return;
+  }
+  vo2Chart = new Chart(ctx, { type: 'line', data, options: opts });
 }
 
 async function loadAndRender(){
