@@ -31,52 +31,69 @@ jobs:
           pip install playwright
           python -m playwright install chromium
 
-      - name: Prepare and validate storage files from secrets
+      - name: Prepare storage_kristin.json from secret (if present) and validate
         env:
           STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp
+          if [ -n "${STORAGE_KRISTIN:-}" ]; then
+            echo "Preparing tmp/storage_kristin.json..."
+            # try base64 decode, otherwise write raw
+            if printf '%s' "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json 2>/dev/null; then
+              echo "Base64 decode succeeded for kristin"
+            else
+              printf '%s' "$STORAGE_KRISTIN" > tmp/storage_kristin.json
+              echo "Wrote raw content for kristin"
+            fi
+            # validate JSON
+            python - <<'PY'
+import json,sys
+p='tmp/storage_kristin.json'
+try:
+  json.load(open(p, 'r', encoding='utf-8'))
+  print('storage_kristin.json valid JSON')
+except Exception as e:
+  print('storage_kristin.json INVALID JSON:', e, file=sys.stderr)
+  sys.exit(2)
+PY
+            echo "Preview (first 200 chars):"
+            head -c 200 tmp/storage_kristin.json || true
+            echo; echo "---"
+          else
+            echo "STORAGE_KRISTIN secret not set; skipping kristin"
+          fi
+
+      - name: Prepare storage_aaron.json from secret (if present) and validate
+        env:
           STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
         run: |
           set -euo pipefail
           mkdir -p tmp
-
-          validate_and_write() {
-            name="$1"
-            var="$2"   # env var value
-            out="tmp/storage_${name}.json"
-            if [ -z "$var" ]; then
-              echo "No secret for $name, skipping."
-              return 0
-            fi
-
-            echo "Preparing $out (attempt base64 decode, else write raw)..."
-
-            # Try base64 decode first (silently). If it fails, fall back to writing raw content.
-            if printf '%s' "$var" | base64 --decode > "${out}" 2>/dev/null; then
-              echo "Base64 decode succeeded for $name -> ${out}"
+          if [ -n "${STORAGE_AARON:-}" ]; then
+            echo "Preparing tmp/storage_aaron.json..."
+            if printf '%s' "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json 2>/dev/null; then
+              echo "Base64 decode succeeded for aaron"
             else
-              echo "Base64 decode failed for $name; writing raw content to ${out}"
-              printf '%s' "$var" > "${out}"
+              printf '%s' "$STORAGE_AARON" > tmp/storage_aaron.json
+              echo "Wrote raw content for aaron"
             fi
-
-            # Validate JSON
-            python - <<PY
+            python - <<'PY'
 import json,sys
-p = "${out}"
+p='tmp/storage_aaron.json'
 try:
-    with open(p,'r', encoding='utf-8') as f:
-        json.load(f)
-    print("Validated JSON for", p)
+  json.load(open(p, 'r', encoding='utf-8'))
+  print('storage_aaron.json valid JSON')
 except Exception as e:
-    print("ERROR: invalid JSON in", p, "-", e, file=sys.stderr)
-    sys.exit(2)
+  print('storage_aaron.json INVALID JSON:', e, file=sys.stderr)
+  sys.exit(2)
 PY
-            echo "Preview (first 200 chars) of ${out}:"
-            head -c 200 "${out}" || true
-            echo -e "\n---"
-          }
-
-          validate_and_write "kristin" "$STORAGE_KRISTIN"
-          validate_and_write "aaron" "$STORAGE_AARON"
+            echo "Preview (first 200 chars):"
+            head -c 200 tmp/storage_aaron.json || true
+            echo; echo "---"
+          else
+            echo "STORAGE_AARON secret not set; skipping aaron"
+          fi
 
       - name: Run fetch script for Kristin (if present)
         run: |
