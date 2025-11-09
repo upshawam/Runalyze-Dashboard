@@ -20,7 +20,7 @@
 </head>
 <body>
   <h1>Runalyze Dashboard (static)</h1>
-  <div class="note">If charts are empty, confirm the JSON files exist at <code>/docs/data/&lt;user&gt;_marathon.json</code> and <code>/docs/data/&lt;user&gt;_vo2.json</code>.</div>
+  <div class="note">If charts are empty, confirm the JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
 
   <div id="controls">
     <label>User A: <input id="userA" value="kristin"></label>
@@ -44,18 +44,13 @@
     const ctxM = document.getElementById('chartMarathon').getContext('2d');
     const ctxV = document.getElementById('chartVo2').getContext('2d');
 
-    // Create charts after adapter is loaded (adapter script tag included above).
-    // Use 'time' scale — Luxon adapter will parse standard ISO date strings.
     const chartM = new Chart(ctxM, {
       type: 'line',
       data: { datasets: [] },
       options: {
         parsing: false,
         scales: {
-          x: {
-            type: 'time',
-            time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' }
-          },
+          x: { type: 'time', time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' } },
           y: { beginAtZero: true }
         },
         plugins: { legend: { display: true } }
@@ -68,10 +63,7 @@
       options: {
         parsing: false,
         scales: {
-          x: {
-            type: 'time',
-            time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' }
-          }
+          x: { type: 'time', time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' } }
         },
         plugins: { legend: { display: true } }
       }
@@ -117,11 +109,11 @@
       const a = document.getElementById('userA').value.trim() || 'kristin';
       const b = document.getElementById('userB').value.trim() || 'aaron';
 
-      // Use relative path "docs/data/..." (no leading slash) so fetch resolves correctly for GitHub Pages
-      const mAPath = `docs/data/${a}_marathon.json`;
-      const mBPath = `docs/data/${b}_marathon.json`;
-      const vAPath = `docs/data/${a}_vo2.json`;
-      const vBPath = `docs/data/${b}_vo2.json`;
+      // For Pages served from docs/, the site root maps to docs/, so JSON files are available at data/...
+      const mAPath = `data/${a}_marathon.json`;
+      const mBPath = `data/${b}_marathon.json`;
+      const vAPath = `data/${a}_vo2.json`;
+      const vBPath = `data/${b}_vo2.json`;
 
       try {
         const [mA, mB, vA, vB] = await Promise.all([
