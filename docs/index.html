@@ -8,13 +8,15 @@
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 24px; }
     #controls { margin-bottom: 12px; }
     canvas { max-width: 1000px; margin-bottom: 28px; }
+    .note { color: #666; font-size: 0.9rem; margin-bottom:8px; }
   </style>
 </head>
 <body>
   <h1>Runalyze Dashboard (static)</h1>
+  <div class="note">If charts are empty, confirm the JSON files exist at <code>/data/&lt;user&gt;_marathon.json</code> and <code>/data/&lt;user&gt;_vo2.json</code>.</div>
   <div id="controls">
-    <label>User A: <input id="userA" value="alice"></label>
-    <label>User B: <input id="userB" value="bob"></label>
+    <label>User A: <input id="userA" value="kristin"></label>
+    <label>User B: <input id="userB" value="aaron"></label>
     <button onclick="refresh()">Refresh</button>
   </div>
 
@@ -55,9 +57,7 @@
     }
 
     function trendToPoints(trendObj) {
-      // trendObj can be object of date->value (as returned by vo2 trend) or nested data.data depending on payload.
       if (!trendObj) return [];
-      // If trendObj is nested under .data (marathon endpoint), handle both shapes.
       const obj = trendObj.data || trendObj.trend || trendObj;
       const entries = Object.entries(obj).map(([d, v]) => ({ x: d, y: v }));
       entries.sort((a,b) => a.x.localeCompare(b.x));
@@ -65,17 +65,19 @@
     }
 
     async function refresh() {
-      const a = document.getElementById('userA').value || 'alice';
-      const b = document.getElementById('userB').value || 'bob';
-      const mA = await fetchJSON(`docs/data/${a}_marathon.json`);
-      const mB = await fetchJSON(`docs/data/${b}_marathon.json`);
+      const a = document.getElementById('userA').value || 'kristin';
+      const b = document.getElementById('userB').value || 'aaron';
+
+      // NOTE: use "data/..." because docs/ is the site root on GitHub Pages when publishing from docs/
+      const mA = await fetchJSON(`data/${a}_marathon.json`);
+      const mB = await fetchJSON(`data/${b}_marathon.json`);
       chartM.data.datasets = [];
       if (mA) chartM.data.datasets.push({ label: a, data: trendToPoints(mA), borderColor: 'steelblue', fill: false });
       if (mB) chartM.data.datasets.push({ label: b, data: trendToPoints(mB), borderColor: 'orange', fill: false });
       chartM.update();
 
-      const vA = await fetchJSON(`docs/data/${a}_vo2.json`);
-      const vB = await fetchJSON(`docs/data/${b}_vo2.json`);
+      const vA = await fetchJSON(`data/${a}_vo2.json`);
+      const vB = await fetchJSON(`data/${b}_vo2.json`);
       chartV.data.datasets = [];
       if (vA && vA.trend) chartV.data.datasets.push({ label: a, data: trendToPoints(vA.trend), borderColor: 'green', fill:false });
       if (vB && vB.trend) chartV.data.datasets.push({ label: b, data: trendToPoints(vB.trend), borderColor: 'purple', fill:false });
