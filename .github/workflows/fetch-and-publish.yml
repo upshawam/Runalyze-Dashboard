@@ -53,8 +53,12 @@ jobs:
           PYTHONUNBUFFERED: 1
         run: |
           mkdir -p docs/data
-          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || echo "kristin fetch failed"
-          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date 2025-08-10 --to-date 2025-11-08 || echo "aaron fetch failed"
+          # Compute dates dynamically (UTC). Keep your original from-date if you want a fixed window.
+          FROM_DATE="2025-08-10"
+          TO_DATE="$(date -u +%F)"
+          echo "Fetching from $FROM_DATE to $TO_DATE"
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date "$FROM_DATE" --to-date "$TO_DATE" || echo "kristin fetch failed"
+          python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date "$FROM_DATE" --to-date "$TO_DATE" || echo "aaron fetch failed"
           ls -la docs/data || true
 
       - name: Commit and push updated docs (use PAT)
