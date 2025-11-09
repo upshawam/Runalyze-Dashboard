@@ -31,117 +31,62 @@ jobs:
           pip install playwright
           python -m playwright install chromium
 
-      - name: Prepare storage_kristin.json from secret (if present) and validate
-        env:
-          STORAGE_KRISTIN: ${{ secrets.STORAGE_KRISTIN }}
+      - name: Prepare/validate storage_kristin.json (if secret present)
         run: |
-          set -euo pipefail
           mkdir -p tmp
-          if [ -n "${STORAGE_KRISTIN:-}" ]; then
-            echo "Preparing tmp/storage_kristin.json..."
-            # try base64 decode, otherwise write raw
-            if printf '%s' "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json 2>/dev/null; then
-              echo "Base64 decode succeeded for kristin"
-            else
-              printf '%s' "$STORAGE_KRISTIN" > tmp/storage_kristin.json
-              echo "Wrote raw content for kristin"
-            fi
-            # validate JSON
-            python - <<'PY'
-import json,sys
-p='tmp/storage_kristin.json'
-try:
-  json.load(open(p, 'r', encoding='utf-8'))
-  print('storage_kristin.json valid JSON')
-except Exception as e:
-  print('storage_kristin.json INVALID JSON:', e, file=sys.stderr)
-  sys.exit(2)
-PY
-            echo "Preview (first 200 chars):"
-            head -c 200 tmp/storage_kristin.json || true
-            echo; echo "---"
+          if [ -n "${{ secrets.STORAGE_KRISTIN }}" ]; then
+            printf '%s' "${{ secrets.STORAGE_KRISTIN }}" > tmp/storage_kristin.json
+            echo "Wrote tmp/storage_kristin.json (size=$(wc -c < tmp/storage_kristin.json) bytes)"
+            python -c "import json,sys; json.load(open('tmp/storage_kristin.json')); print('kristin JSON OK')" || (echo "ERROR: kristin storage is not valid JSON" && exit 2)
           else
-            echo "STORAGE_KRISTIN secret not set; skipping kristin"
+            echo "STORAGE_KRISTIN not set; skipping kristin"
           fi
 
-      - name: Prepare storage_aaron.json from secret (if present) and validate
-        env:
-          STORAGE_AARON: ${{ secrets.STORAGE_AARON }}
+      - name: Prepare/validate storage_aaron.json (if secret present)
         run: |
-          set -euo pipefail
           mkdir -p tmp
-          if [ -n "${STORAGE_AARON:-}" ]; then
-            echo "Preparing tmp/storage_aaron.json..."
-            if printf '%s' "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json 2>/dev/null; then
-              echo "Base64 decode succeeded for aaron"
-            else
-              printf '%s' "$STORAGE_AARON" > tmp/storage_aaron.json
-              echo "Wrote raw content for aaron"
-            fi
-            python - <<'PY'
-import json,sys
-p='tmp/storage_aaron.json'
-try:
-  json.load(open(p, 'r', encoding='utf-8'))
-  print('storage_aaron.json valid JSON')
-except Exception as e:
-  print('storage_aaron.json INVALID JSON:', e, file=sys.stderr)
-  sys.exit(2)
-PY
-            echo "Preview (first 200 chars):"
-            head -c 200 tmp/storage_aaron.json || true
-            echo; echo "---"
+          if [ -n "${{ secrets.STORAGE_AARON }}" ]; then
+            printf '%s' "${{ secrets.STORAGE_AARON }}" > tmp/storage_aaron.json
+            echo "Wrote tmp/storage_aaron.json (size=$(wc -c < tmp/storage_aaron.json) bytes)"
+            python -c "import json,sys; json.load(open('tmp/storage_aaron.json')); print('aaron JSON OK')" || (echo "ERROR: aaron storage is not valid JSON" && exit 2)
           else
-            echo "STORAGE_AARON secret not set; skipping aaron"
+            echo "STORAGE_AARON not set; skipping aaron"
           fi
 
-      - name: Run fetch script for Kristin (if present)
+      - name: Run fetch for kristin (if present)
         run: |
           mkdir -p docs/data
           if [ -f tmp/storage_kristin.json ]; then
             echo "Running fetch for kristin..."
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || (echo "kristin fetch failed (non-zero exit)" && exit 1)
+            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_kristin.json --user kristin --from-date 2025-08-10 --to-date 2025-11-08 || (echo "kristin fetch failed"; exit 1)
           else
-            echo "No tmp/storage_kristin.json; skipping kristin"
+            echo "No tmp/storage_kristin.json; skipped kristin"
           fi
 
-      - name: Run fetch script for Aaron (if present)
+      - name: Run fetch for aaron (if present)
         run: |
           mkdir -p docs/data
           if [ -f tmp/storage_aaron.json ]; then
             echo "Running fetch for aaron..."
-            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json --user aaron --from-date 2025-08-10 --to-date 2025-11-08 || (echo "aaron fetch failed (non-zero exit)" && exit 1)
+            python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json --user aaron --from-date 2025-08-10 --to-date 2025-11-08 || (echo "aaron fetch failed"; exit 1)
           else
-            echo "No tmp/storage_aaron.json; skipping aaron"
+            echo "No tmp/storage_aaron.json; skipped aaron"
           fi
 
-      - name: Show produced data files (for debug)
+      - name: Show produced data files (quick)
         run: |
           ls -la docs/data || true
-          echo "Show brief _meta from each JSON (if present):"
           for f in docs/data/*_*.json; do
-            echo "---- $f ----"
-            python - <<PY
-import json,sys
-p="${f}"
-try:
-    j=json.load(open(p))
-    meta=j.get('_meta') or j.get('meta') or {}
-    print(json.dumps({'_meta': meta}, indent=2))
-except Exception as e:
-    print("Could not parse", p, e)
-PY
+            echo "==== $f ===="
+            python -c "import json,sys; j=json.load(open('$f')); print(j.get('_meta') or j.get('meta') or {})" || echo "Could not parse $f"
           done
 
-      - name: Commit and push updated docs/data (use PAT)
+      - name: Commit and push updated docs/data (use PAT if available)
         env:
-          GIT_COMMITTER_NAME: "github-actions[bot]"
-          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
           ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
         run: |
-          set -euo pipefail
-          git config user.name "${GIT_COMMITTER_NAME}"
-          git config user.email "${GIT_COMMITTER_EMAIL}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data || true
           if git diff --cached --quiet; then
             echo "No data changes to commit"
