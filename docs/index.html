@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <title>VO₂ Max & Marathon Shape</title>
-
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <!-- Chart.js -->
@@ -12,116 +11,27 @@
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
 
-  <style>
-    /* Page baseline (tight) */
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 10px; background:#fff; color:#222; }
-    .page-title { font-size:0.98rem; font-weight:700; margin-bottom:6px; }
-    .note { color:#666; font-size:0.88rem; margin-bottom:8px; }
-
-    .chart-wrap { max-width:1100px; margin:10px auto; }
-    canvas { width:100% !important; height:300px !important; display:block; background:#fff; border-radius:4px; }
-
-    .tables-wrap { max-width:1100px; margin:6px auto 24px; }
-
-    /* Compact Runalyze-like table (tighter) */
-    .rz-table {
-      width:100%;
-      border-collapse:collapse;
-      font-size:0.92rem;
-      color:#333;
-      background: #fff;
-    }
-
-    /* Group header row (Required) */
-    .rz-table thead tr.group-row th {
-      text-align:center;
-      font-weight:700;
-      padding:5px 4px;
-      border-bottom:1px solid #e0e0e0;
-      background: transparent;
-      font-size:0.94rem;
-    }
-
-    /* Column labels row */
-    .rz-table thead tr.label-row th {
-      font-weight:700;
-      padding:7px 8px;
-      background:#fafafa;
-      border-bottom:1px solid #e6e6e6;
-      text-align:left;
-      font-size:0.90rem;
-    }
-
-    /* vertical divider lines between groups */
-    .rz-table thead tr.label-row th:nth-child(2),
-    .rz-table tbody td:nth-child(2) { border-left:1px solid #e6e6e6; }
-    .rz-table thead tr.label-row th:nth-child(5),
-    .rz-table tbody td:nth-child(5) { border-left:1px solid #e6e6e6; }
-
-    /* cells - reduced padding to squeeze rows */
-    .rz-table tbody td {
-      padding:6px 8px;
-      border-bottom:1px solid #f2f2f2;
-      vertical-align:middle;
-    }
-
-    /* alternating row background subtle */
-    .rz-table tbody tr:nth-child(odd) td { background: #fff; }
-    .rz-table tbody tr:nth-child(even) td { background: #fbfcfd; }
-
-    /* distance column: bold, compact */
-    .rz-table tbody td:nth-child(1) { font-weight:700; white-space:nowrap; width:16%; padding-left:8px; }
-
-    /* achieved column: centered and compact */
-    .rz-table tbody td:nth-child(5) { text-align:center; width:11%; white-space:nowrap; padding-right:8px; }
-
-    /* center helper */
-    .center { text-align:center; }
-
-    /* prognosis & optimum (hide on small screens) */
-    .hidden-mobile { display:table-cell; }
-    @media (max-width:920px) {
-      .hidden-mobile { display:none; }
-    }
-
-    .small { font-size:0.85rem; color:#666; margin:0; padding:0; }
-
-    /* stronger separators for marathon goal row: visible but not huge */
-    .top-separated td { border-top:1.5px solid #d6d6d6; }
-    .bottom-separated td { border-bottom:1.5px solid #d6d6d6; }
-
-    /* icons */
-    .fa-check.plus, .plus { color:#1a9a42; font-weight:700; }
-    .fa-xmark.minus, .minus { color:#c1392b; font-weight:700; }
-
-    /* user header compact */
-    .user-block { display:flex; justify-content:space-between; align-items:flex-start; margin:8px 0 4px; gap:8px; }
-    .user-title { font-weight:700; font-size:0.98rem; margin:0; }
-    .user-meta { text-align:right; font-size:0.84rem; color:#666; margin-top:2px; }
-
-    .fa-solid { font-size:0.95rem; vertical-align:middle; }
-
-    /* very compact on narrow screens */
-    @media (max-width:720px) {
-      .rz-table thead tr.label-row th, .rz-table tbody td { padding:5px 6px; font-size:0.88rem; }
-      canvas { height:240px !important; }
-    }
-  </style>
+  <!-- App styles -->
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="page-title">VO₂ Max & Marathon Shape</div>
-  <div class="note">Displays VO₂ trend and Runalyze-style Marathon Shape table per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
+  <header style="padding:10px 12px">
+    <div class="page-title">VO₂ Max & Marathon Shape</div>
+    <div class="note">Displays VO₂ trend and Runalyze-style Marathon Shape table per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
+  </header>
 
   <div id="errors" style="color:#b00;font-weight:700"></div>
 
-  <section class="chart-wrap">
-    <h2 style="margin:6px 0 8px;font-size:0.94rem">VO₂ Max Trend (last 30 days)</h2>
-    <canvas id="vo2Chart" aria-label="VO2 trend"></canvas>
-  </section>
+  <main>
+    <section class="chart-wrap">
+      <h2 class="chart-heading">VO₂ Max Trend (last 30 days)</h2>
+      <canvas id="vo2Chart" aria-label="VO2 trend"></canvas>
+    </section>
 
-  <div class="tables-wrap">
-    <div id="tables" class="rz-wrapper"></div>
-  </div>
+    <div class="tables-wrap">
+      <div id="tables" class="rz-wrapper"></div>
+    </div>
+  </main>
 
   <script src="app.js"></script>
 </body>
