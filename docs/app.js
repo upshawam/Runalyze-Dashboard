@@ -1,4 +1,5 @@
 // app.js - compact table adjustments + ensure 100% marathon row has top+bottom divider
+// No behavior change: builds the same table as before; styling moved to style.css
 
 const ERR_EL = document.getElementById('errors') || { textContent: '' };
 const TABLES_EL = document.getElementById('tables');
@@ -136,10 +137,22 @@ function nbspMi(text){
   return text.replace(/(\d[\d,\.]*)\s*mi/gi, '$1\u00a0mi');
 }
 
+/* Return true if row should be highlighted as marathon-goal (100% / 26.2) */
+function isMarathonGoalRow(r){
+  if(!r) return false;
+  if(typeof r.required_pct === 'number' && r.required_pct === 100) return true;
+  if(typeof r.requiredPct === 'number' && r.requiredPct === 100) return true;
+  if(typeof r.distance_mi === 'number' && Math.abs(r.distance_mi - 26.2) < 0.2) return true;
+  if(typeof r.mi === 'number' && Math.abs(r.mi - 26.2) < 0.2) return true;
+  const lbl = (r.distance_label || r.label || '').toString().toLowerCase();
+  if(lbl.includes('26,2') || lbl.includes('26.2') || /\b26\b/.test(lbl)) return true;
+  return false;
+}
+
 async function loadAndRender(){
   showError('');
   try{
-    // fetch for each user
+    // fetch data
     const allFetches = [];
     for(const u of USERS){
       allFetches.push(fetchJSON(`data/${u}_vo2.json`).catch(()=>null));
@@ -160,7 +173,7 @@ async function loadAndRender(){
       };
     }
 
-    // VO2 chart
+    // VO2 chart (unchanged)
     const last30 = getLastNDates(30);
     const vo2Datasets = [];
     for(const u of USERS){
@@ -185,7 +198,7 @@ async function loadAndRender(){
       const latest = findLatestValue(marMap);
       const currentPct = latest ? (latest.value * 100) : null;
 
-      // last-updated: prefer marathon JSON _meta, then requirements, then prognosis
+      // last-updated selection
       let lastUpdated = null;
       if(data.marathon && typeof data.marathon === 'object'){
         if(data.marathon._meta && data.marathon._meta.last_updated) lastUpdated = data.marathon._meta.last_updated;
@@ -212,7 +225,7 @@ async function loadAndRender(){
         </div>
       `;
 
-      // Build rows HTML
+      // Build rows
       let rowsHtml = '';
       if(req && Array.isArray(req.entries) && req.entries.length){
         for(const r of req.entries){
@@ -228,8 +241,7 @@ async function loadAndRender(){
           if(r.optimum_time && (r.achieved_pct === null || r.achieved_pct < 100)){
             optimumText = r.optimum_time;
           }
-          // ensure 100% marathon row gets both top and bottom separators
-          const special = (typeof r.required_pct === 'number' && r.required_pct === 100) ? ' top-separated bottom-separated' : '';
+          const special = isMarathonGoalRow(r) ? ' top-separated bottom-separated' : '';
           rowsHtml += `<tr class="r${special}">
             <td class="nowrap-mi">${label}</td>
             <td>${required}</td>
@@ -258,8 +270,7 @@ async function loadAndRender(){
             if(match && match.time) progText = match.time;
           }
           const optimumText = (achievedText && achievedText !== '-' && parseInt(achievedText) < 100) ? (progText || '-') : '-';
-          // ensure fallback 100% row also gets separators if present in RUNALYZE_ROWS
-          const special = (typeof r.requiredPct === 'number' && r.requiredPct === 100) ? ' top-separated bottom-separated' : '';
+          const special = isMarathonGoalRow(r) ? ' top-separated bottom-separated' : '';
           rowsHtml += `<tr class="r${special}">
             <td class="nowrap-mi">${label}</td>
             <td>${r.requiredPct}%</td>
@@ -273,8 +284,21 @@ async function loadAndRender(){
         }
       }
 
+      // fixed col widths to avoid overly wide columns
+      const colgroup = `<colgroup>
+          <col style="width:14%" />
+          <col style="width:10%" />
+          <col style="width:24%" />
+          <col style="width:12%" />
+          <col style="width:8%" />
+          <col style="width:3%" />
+          <col style="width:16%" class="hidden-mobile" />
+          <col style="width:13%" class="hidden-mobile" />
+        </colgroup>`;
+
       const tableHtml = `
         <table class="rz-table" aria-label="${u} marathon requirements">
+          ${colgroup}
           <thead>
             <tr class="group-row">
               <th></th>
