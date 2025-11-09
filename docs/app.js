@@ -27,24 +27,22 @@ async function fetchJSON(path) {
   }
 }
 
-// Convert trend JSON (various shapes) into [{x: <Date>, y: <number>}...]
+// Convert trend JSON into [{x: Date, y: number}, ...]
 function trendToPoints(trendObj) {
   if (!trendObj) return [];
   const obj = trendObj.data || trendObj.trend || trendObj;
 
   const entries = Object.entries(obj).map(([k, v]) => {
-    // Normalize x -> Date object
     let x = null;
     if (/^\d+$/.test(k)) {
       let n = Number(k);
-      if (n < 1e12) n = n * 1000; // seconds -> ms
+      if (n < 1e12) n = n * 1000;
       x = new Date(n);
     } else {
       const parsed = Date.parse(k);
       x = isNaN(parsed) ? null : new Date(parsed);
     }
 
-    // Normalize y
     let y = null;
     if (typeof v === 'number') y = v;
     else if (v && typeof v === 'object') {
@@ -64,16 +62,14 @@ function trendToPoints(trendObj) {
   return entries;
 }
 
-// Return points from last n days (inclusive)
 function filterLastNDays(points, n) {
   if (!points || points.length === 0) return [];
-  const end = new Date(); // now
+  const end = new Date();
   const start = new Date(end);
-  start.setDate(end.getDate() - n + 1); // include today as part of n days
+  start.setDate(end.getDate() - n + 1);
   return points.filter(p => p.x >= start && p.x <= end);
 }
 
-// Create charts
 const ctxM = document.getElementById('chartMarathon').getContext('2d');
 const ctxV = document.getElementById('chartVo2').getContext('2d');
 
@@ -83,14 +79,10 @@ const chartM = new Chart(ctxM, {
   options: {
     parsing: false,
     scales: {
-      x: {
-        type: 'time',
-        time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' },
-        ticks: { maxRotation: 0, autoSkip: true }
-      },
+      x: { type: 'time', time: { unit: 'day', tooltipFormat: 'DD LLL yyyy' }, ticks: { maxRotation:0, autoSkip:true } },
       y: { beginAtZero: false }
     },
-    elements: { point: { radius: 3 } },
+    elements: { point: { radius: 3 }, line: { borderWidth: 2 } },
     plugins: { legend: { display: true } },
     responsive: true,
     maintainAspectRatio: false
@@ -103,7 +95,7 @@ const chartV = new Chart(ctxV, {
   options: {
     parsing: false,
     scales: { x: { type: 'time', time: { unit: 'day' } } },
-    elements: { point: { radius: 2 } },
+    elements: { point: { radius: 3 }, line: { borderWidth: 2 } },
     plugins: { legend: { display: true } },
     responsive: true,
     maintainAspectRatio: false
@@ -135,47 +127,58 @@ async function loadAndRender() {
       fetchJSON(vBPath).catch(err => { showError(err.message); return null; })
     ]);
 
-    // Marathon: convert and show only last 30 days (progress graph)
     const mApointsAll = mAraw ? trendToPoints(mAraw) : [];
     const mBpointsAll = mBraw ? trendToPoints(mBraw) : [];
     const mApoints = filterLastNDays(mApointsAll, 30);
     const mBpoints = filterLastNDays(mBpointsAll, 30);
 
-    // Build datasets for marathon (last 30 days)
+    // Ensure datasets use visible line settings and no full fill to avoid obscuring thin lines
     const dsM = [];
     if (mApoints.length) dsM.push({
       label: `${a} (30d)`,
       data: mApoints,
       borderColor: 'steelblue',
-      backgroundColor: 'rgba(70,130,180,0.08)',
+      backgroundColor: 'transparent',
       tension: 0.2,
-      fill: true,
-      pointRadius: 3
+      fill: false,
+      pointRadius: 3,
+      borderWidth: 2,
+      showLine: true
     });
     if (mBpoints.length) dsM.push({
       label: `${b} (30d)`,
       data: mBpoints,
       borderColor: 'orange',
-      backgroundColor: 'rgba(255,165,0,0.08)',
+      backgroundColor: 'transparent',
       tension: 0.2,
-      fill: true,
-      pointRadius: 3
+      fill: false,
+      pointRadius: 3,
+      borderWidth: 2,
+      showLine: true
     });
     chartM.data.datasets = dsM;
 
-    // VO2: keep the trend series (full available range)
     const dsV = [];
     if (vAraw && (vAraw.trend || vAraw)) {
       const pts = trendToPoints(vAraw.trend || vAraw);
-      dsV.push({ label: a, data: pts, borderColor: 'green', fill:false, tension:0.1 });
+      dsV.push({ label: a, data: pts, borderColor: 'green', backgroundColor: 'transparent', fill:false, tension:0.1, borderWidth:2, pointRadius:3 });
     }
     if (vBraw && (vBraw.trend || vBraw)) {
       const pts = trendToPoints(vBraw.trend || vBraw);
-      dsV.push({ label: b, data: pts, borderColor: 'purple', fill:false, tension:0.1 });
+      dsV.push({ label: b, data: pts, borderColor: 'purple', backgroundColor: 'transparent', fill:false, tension:0.1, borderWidth:2, pointRadius:3 });
     }
     chartV.data.datasets = dsV;
 
-    // Show simple summary (current values) in status for quick confirmation
+    // Force x-axis range for marathon to last 30 days to avoid collapsed domain
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - 30 + 1);
+    if (chartM.options && chartM.options.scales && chartM.options.scales.x) {
+      chartM.options.scales.x.min = start;
+      chartM.options.scales.x.max = end;
+    }
+
+    // status quick summary
     const mAlatest = latestPoint(mApoints);
     const mBlatest = latestPoint(mBpoints);
     const vAlatest = latestPoint(trendToPoints(vAraw ? (vAraw.trend || vAraw) : null));
@@ -188,13 +191,15 @@ async function loadAndRender() {
     if (vBlatest) statusText += `${b} VO2: ${vBlatest.y.toFixed(2)} `;
     showStatus(statusText || 'Loaded');
 
-    // Debug logs
+    // Force resize, then update only if datasets present
+    chartM.resize();
+    chartV.resize();
+    if (chartM.data.datasets && chartM.data.datasets.length) chartM.update();
+    if (chartV.data.datasets && chartV.data.datasets.length) chartV.update();
+
+    // Debug log (optional)
     console.log('Marathon 30d points', a, mApoints.length, b, mBpoints.length);
     console.log('VO2 points', a, vAlatest ? 'has' : 'none', b, vBlatest ? 'has' : 'none');
-
-    // Update charts
-    try { chartM.update(); } catch (e) { showError('ChartM update error: ' + e.message); console.error(e); }
-    try { chartV.update(); } catch (e) { showError('ChartV update error: ' + e.message); console.error(e); }
 
   } catch (e) {
     showError('Unexpected error: ' + e.message);
@@ -203,6 +208,5 @@ async function loadAndRender() {
   }
 }
 
-// Wire up button and initial load
 refreshBtn.addEventListener('click', loadAndRender);
 window.addEventListener('load', loadAndRender);
