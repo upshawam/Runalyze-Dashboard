@@ -1,5 +1,5 @@
-// compact app.js (simplified): no colgroup, no measurement.
-// table uses natural widths (table-layout:auto) and CSS constrains problem columns.
+// docs/app.js - reordered columns: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly mileage, Long Run
+// Weekly column gets class "weekly-col"; Prognosis/Optimum get "hidden-mobile" so CSS controls their sizing/hiding.
 
 const USERS = ['kristin','aaron'];
 const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
@@ -19,7 +19,7 @@ const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
 const isMarathonGoal = r => { if(!r) return false; if(typeof r.required_pct==='number' && r.required_pct===100) return true; if(typeof r.requiredPct==='number' && r.requiredPct===100) return true; if(typeof r.distance_mi==='number' && Math.abs(r.distance_mi-26.2)<0.2) return true; if(typeof r.mi==='number' && Math.abs(r.mi-26.2)<0.2) return true; const lbl=(r.distance_label||r.label||'').toString(); return /\b26[.,]?2\b/.test(lbl) || /\b26\b/.test(lbl); };
 
-/* draw VO2 (unchanged) */
+/* draw VO2 */
 let vo2Chart = null;
 function drawVo2(ctx, labels, datasets){
   const data = { labels, datasets };
@@ -79,14 +79,15 @@ async function loadAndRender(){
       let rows = [];
       if(req && Array.isArray(req.entries) && req.entries.length){
         rows = req.entries.map(r => ({
-          label: nbspMi(r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-')),
-          required: (r.required_pct!=null) ? `${r.required_pct}%` : '-',
-          weekly: nbspMi(r.weekly || '-'),
-          longRun: nbspMi(r.long_run || '-'),
-          achieved: (r.achieved_pct!=null)? `${r.achieved_pct}%` : '-',
+          // NEW ORDER: Distance, Achieved, Icon, Prognosis, Optimum, Marathon Shape, Weekly, LongRun
+          distance: nbspMi(r.distance_label || (r.distance_mi ? `${r.distance_mi} mi` : '-')),
+          achieved: (r.achieved_pct!=null) ? `${r.achieved_pct}%` : '-',
           icon: r.achieved_ok ? '<i class="fa-solid fa-check plus" aria-hidden="true"></i>' : '<i class="fa-solid fa-xmark minus" aria-hidden="true"></i>',
           prog: r.prognosis_time || '-',
           opt: (r.optimum_time && (r.achieved_pct==null || r.achieved_pct<100)) ? r.optimum_time : '-',
+          shape: (r.required_pct!=null) ? `${r.required_pct}%` : '-',
+          weekly: nbspMi(r.weekly || '-'),
+          longRun: nbspMi(r.long_run || '-'),
           goal: isMarathonGoal(r)
         }));
       } else {
@@ -104,21 +105,23 @@ async function loadAndRender(){
           const achieved = currentPct!==null && r.p ? `${Math.round((currentPct / r.p)*100)}%` : '-';
           const ok = achieved !== '-' && parseInt(achieved) >= 100;
           return {
-            label: nbspMi(r.label),
-            required: `${r.p}%`,
-            weekly: r.weekly,
-            longRun: r.long,
+            distance: nbspMi(r.label),
             achieved,
             icon: ok ? '<i class="fa-solid fa-check plus" aria-hidden="true"></i>' : '<i class="fa-solid fa-xmark minus" aria-hidden="true"></i>',
-            prog: '-', opt: '-', goal: (r.p === 100)
+            prog: '-', opt: '-',
+            shape: `${r.p}%`,
+            weekly: r.weekly,
+            longRun: r.long,
+            goal: (r.p === 100)
           };
         });
+        // try fill prognosis from d.prognosis.entries
         if(d.prognosis && Array.isArray(d.prognosis.entries)){
           rows = rows.map(row=>{
             const match = d.prognosis.entries.find(e=>{
-              if(typeof e.distance_mi === 'number') return Math.abs(e.distance_mi - parseFloat(row.label)) < 0.5;
+              if(typeof e.distance_mi === 'number') return Math.abs(e.distance_mi - parseFloat(row.distance)) < 0.5;
               const lbl = (e.distance_label||'').toString();
-              return lbl && lbl.includes(row.label.split('\u00a0')[0]);
+              return lbl && lbl.includes(row.distance.split('\u00a0')[0]);
             });
             if(match && match.time) row.prog = match.time;
             return row;
@@ -126,24 +129,39 @@ async function loadAndRender(){
         }
       }
 
+      // render rows in NEW ORDER
       const rowsHtml = rows.map(r => `
         <tr class="r${r.goal ? ' marathon-goal top-separated bottom-separated' : ''}">
-          <td class="nowrap-mi">${r.label}</td>
-          <td>${r.required}</td>
-          <td>${r.weekly}</td>
-          <td>${r.longRun}</td>
+          <td class="nowrap-mi">${r.distance}</td>
           <td class="center">${r.achieved}</td>
-          <td class="center">${r.icon}</td>
+          <td class="center icon-col" aria-hidden="true">${r.icon}</td>
+
           <td class="left-separated hidden-mobile">${r.prog}</td>
           <td class="hidden-mobile">${r.opt}</td>
+
+          <td>${r.shape}</td>
+          <td class="weekly-col">${r.weekly}</td>
+          <td>${r.longRun}</td>
         </tr>`).join('');
 
       const tableHtml = `
         ${header}
         <table class="rz-table" aria-label="${u} marathon requirements">
           <thead>
-            <tr class="group-row"><th></th><th colspan="3">Required</th><th colspan="2"></th><th colspan="2" class="hidden-mobile"></th></tr>
-            <tr class="label-row"><th>Distance</th><th>Marathon Shape</th><th>Weekly mileage</th><th>Long Run</th><th>Achieved</th><th></th><th class="hidden-mobile">Prognosis</th><th class="hidden-mobile">Optimum</th></tr>
+            <tr class="group-row">
+              <th></th><th></th><th></th><th></th><th></th>
+              <th colspan="3">Required</th>
+            </tr>
+            <tr class="label-row">
+              <th>Distance</th>
+              <th>Achieved</th>
+              <th></th>
+              <th class="hidden-mobile">Prognosis</th>
+              <th class="hidden-mobile">Optimum</th>
+              <th>Marathon Shape</th>
+              <th class="weekly-col">Weekly mileage</th>
+              <th>Long Run</th>
+            </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>`;
