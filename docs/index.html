@@ -13,72 +13,70 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
 
   <style>
-    /* Page baseline */
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 20px; background:#fff; color:#222; }
-    .page-title { font-size:1.15rem; font-weight:700; margin-bottom:6px; }
-    .note { color:#666; font-size:0.95rem; margin-bottom:12px; }
+    /* Page baseline (tight) */
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; margin: 10px; background:#fff; color:#222; }
+    .page-title { font-size:0.98rem; font-weight:700; margin-bottom:6px; }
+    .note { color:#666; font-size:0.88rem; margin-bottom:8px; }
 
-    .chart-wrap { max-width:1200px; margin:18px auto; }
-    canvas { width:100% !important; height:360px !important; display:block; background:#fff; border-radius:6px; }
+    .chart-wrap { max-width:1100px; margin:10px auto; }
+    canvas { width:100% !important; height:300px !important; display:block; background:#fff; border-radius:4px; }
 
-    /* Overall table container to center content like Runalyze */
-    .tables-wrap { max-width:1100px; margin:8px auto 40px; }
+    .tables-wrap { max-width:1100px; margin:6px auto 24px; }
 
-    /* Runalyze-like table */
+    /* Compact Runalyze-like table (tighter) */
     .rz-table {
       width:100%;
       border-collapse:collapse;
-      font-size:0.96rem;
+      font-size:0.92rem;
       color:#333;
       background: #fff;
     }
 
-    /* First header row (group label) */
+    /* Group header row (Required) */
     .rz-table thead tr.group-row th {
       text-align:center;
       font-weight:700;
-      padding:10px 6px;
-      border-bottom:1px solid #d9d9d9;
+      padding:5px 4px;
+      border-bottom:1px solid #e0e0e0;
       background: transparent;
+      font-size:0.94rem;
     }
 
-    /* Second header row (column labels) */
+    /* Column labels row */
     .rz-table thead tr.label-row th {
       font-weight:700;
-      padding:10px 12px;
+      padding:7px 8px;
       background:#fafafa;
-      border-bottom:2px solid #e6e6e6;
+      border-bottom:1px solid #e6e6e6;
       text-align:left;
+      font-size:0.90rem;
     }
 
-    /* vertical divider line between left distance column and required block */
+    /* vertical divider lines between groups */
     .rz-table thead tr.label-row th:nth-child(2),
-    .rz-table tbody td:nth-child(2) {
-      border-left:1px solid #dcdcdc;
-    }
-
-    /* also divider between required block and achieved block (after 4th column) */
+    .rz-table tbody td:nth-child(2) { border-left:1px solid #e6e6e6; }
     .rz-table thead tr.label-row th:nth-child(5),
-    .rz-table tbody td:nth-child(5) {
-      border-left:1px solid #dcdcdc;
-    }
+    .rz-table tbody td:nth-child(5) { border-left:1px solid #e6e6e6; }
 
-    /* cells */
+    /* cells - reduced padding to squeeze rows */
     .rz-table tbody td {
-      padding:12px 12px;
-      border-bottom:1px solid #f0f0f0;
+      padding:6px 8px;
+      border-bottom:1px solid #f2f2f2;
       vertical-align:middle;
     }
 
-    /* light alternating background for rows */
+    /* alternating row background subtle */
     .rz-table tbody tr:nth-child(odd) td { background: #fff; }
     .rz-table tbody tr:nth-child(even) td { background: #fbfcfd; }
 
-    /* distance column bold, no wrap */
-    .rz-table tbody td:nth-child(1) { font-weight:700; white-space:nowrap; width:18%; }
+    /* distance column: bold, compact */
+    .rz-table tbody td:nth-child(1) { font-weight:700; white-space:nowrap; width:16%; padding-left:8px; }
 
-    /* keep achieved column compact and centered */
-    .rz-table tbody td:nth-child(5) { text-align:center; width:12%; white-space:nowrap; }
+    /* achieved column: centered and compact */
+    .rz-table tbody td:nth-child(5) { text-align:center; width:11%; white-space:nowrap; padding-right:8px; }
+
+    /* center helper */
+    .center { text-align:center; }
 
     /* prognosis & optimum (hide on small screens) */
     .hidden-mobile { display:table-cell; }
@@ -86,32 +84,28 @@
       .hidden-mobile { display:none; }
     }
 
-    /* thinner text for small meta */
-    .small { font-size:0.88rem; color:#666; }
+    .small { font-size:0.85rem; color:#666; margin:0; padding:0; }
 
-    /* heavier separators used by Runalyze sample: apply to rows that should be emphasized */
-    .top-separated td { border-top:2px solid #dcdcdc; }
-    .bottom-separated td { border-bottom:2px solid #dcdcdc; }
+    /* stronger separators for marathon goal row: visible but not huge */
+    .top-separated td { border-top:1.5px solid #d6d6d6; }
+    .bottom-separated td { border-bottom:1.5px solid #d6d6d6; }
 
-    /* achieved icons styling */
+    /* icons */
     .fa-check.plus, .plus { color:#1a9a42; font-weight:700; }
     .fa-xmark.minus, .minus { color:#c1392b; font-weight:700; }
 
-    /* centre small columns like the sample */
-    .rz-table td.center { text-align:center; }
+    /* user header compact */
+    .user-block { display:flex; justify-content:space-between; align-items:flex-start; margin:8px 0 4px; gap:8px; }
+    .user-title { font-weight:700; font-size:0.98rem; margin:0; }
+    .user-meta { text-align:right; font-size:0.84rem; color:#666; margin-top:2px; }
 
-    /* subtle left/right padding reduction to get the compact Runalyze look */
-    .rz-table thead th, .rz-table tbody td { padding-left:12px; padding-right:12px; }
+    .fa-solid { font-size:0.95rem; vertical-align:middle; }
 
-    /* user header that shows last-updated/time */
-    .user-block { display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px; }
-    .user-title { font-weight:700; font-size:1rem; margin-bottom:2px; }
-
-    /* subtle border left on the entire table block (visual column separation) */
-    .rz-wrapper { border-left:1px solid transparent; border-right:1px solid transparent; padding:6px 0; }
-
-    /* ensure check/X icons don't push row height too much */
-    .fa-solid { font-size:1.05rem; vertical-align:middle; }
+    /* very compact on narrow screens */
+    @media (max-width:720px) {
+      .rz-table thead tr.label-row th, .rz-table tbody td { padding:5px 6px; font-size:0.88rem; }
+      canvas { height:240px !important; }
+    }
   </style>
 </head>
 <body>
@@ -121,7 +115,7 @@
   <div id="errors" style="color:#b00;font-weight:700"></div>
 
   <section class="chart-wrap">
-    <h2>VO₂ Max Trend (last 30 days)</h2>
+    <h2 style="margin:6px 0 8px;font-size:0.94rem">VO₂ Max Trend (last 30 days)</h2>
     <canvas id="vo2Chart" aria-label="VO2 trend"></canvas>
   </section>
 
