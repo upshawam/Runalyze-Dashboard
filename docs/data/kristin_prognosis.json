@@ -1,6 +1,6 @@
 {
   "meta": {
-    "login_detected": false,
+    "login_detected": true,
     "found": true
   },
   "entries": [
@@ -13,29 +13,29 @@
     {
       "distance_label": "3,11&nbsp;mi",
       "distance_mi": 3.11,
-      "time": "22:57",
-      "pace": "7:23/mi"
+      "time": "22:54",
+      "pace": "7:22/mi"
     },
     {
       "distance_label": "6,21&nbsp;mi",
       "distance_mi": 6.21,
-      "time": "47:36",
-      "pace": "7:40/mi"
+      "time": "47:30",
+      "pace": "7:39/mi"
     },
     {
       "distance_label": "13,11&nbsp;mi",
       "distance_mi": 13.11,
-      "time": "1:45:32",
-      "pace": "8:03/mi"
+      "time": "1:45:20",
+      "pace": "8:02/mi"
     },
     {
       "distance_label": "26,22&nbsp;mi",
       "distance_mi": 26.22,
-      "time": "4:02:59",
-      "pace": "9:16/mi"
+      "time": "4:02:34",
+      "pace": "9:15/mi"
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-11T01:46:38Z"
+    "last_updated": "2025-11-12T01:45:48Z"
   }
 }
