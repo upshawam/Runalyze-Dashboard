@@ -1,6 +1,6 @@
 {
   "meta": {
-    "login_detected": true,
+    "login_detected": false,
     "found": true
   },
   "entries": [
@@ -31,11 +31,11 @@
     {
       "distance_label": "26,22&nbsp;mi",
       "distance_mi": 26.22,
-      "time": "4:02:34",
-      "pace": "9:15/mi"
+      "time": "4:03:28",
+      "pace": "9:17/mi"
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-12T01:45:48Z"
+    "last_updated": "2025-11-13T01:47:32Z"
   }
 }
