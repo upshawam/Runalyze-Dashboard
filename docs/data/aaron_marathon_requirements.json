@@ -10,9 +10,9 @@
       "required_pct": 7,
       "weekly": "ca. 5 mi",
       "long_run": "-",
-      "achieved_pct": 951,
+      "achieved_pct": 949,
       "achieved_ok": true,
-      "prognosis_time": "22:11",
+      "prognosis_time": "21:59",
       "optimum_time": null
     },
     {
@@ -21,9 +21,9 @@
       "required_pct": 17,
       "weekly": "ca. 12 mi",
       "long_run": "-",
-      "achieved_pct": 405,
+      "achieved_pct": 404,
       "achieved_ok": true,
-      "prognosis_time": "45:59",
+      "prognosis_time": "45:35",
       "optimum_time": null
     },
     {
@@ -32,20 +32,20 @@
       "required_pct": 31,
       "weekly": "ca. 20 mi",
       "long_run": "-",
-      "achieved_pct": 226,
+      "achieved_pct": 225,
       "achieved_ok": true,
-      "prognosis_time": "1:16:21",
+      "prognosis_time": "1:15:39",
       "optimum_time": null
     },
     {
       "distance_label": "13,1 mi",
       "distance_mi": 13.1,
       "required_pct": 43,
-      "weekly": "ca. 26 mi",
+      "weekly": "ca. 27 mi",
       "long_run": "ca. 12 mi",
-      "achieved_pct": 162,
+      "achieved_pct": 161,
       "achieved_ok": true,
-      "prognosis_time": "1:41:57",
+      "prognosis_time": "1:41:03",
       "optimum_time": null
     },
     {
@@ -56,44 +56,44 @@
       "long_run": "ca. 18 mi",
       "achieved_pct": 69,
       "achieved_ok": false,
-      "prognosis_time": "3:56:08",
-      "optimum_time": "3:31:40"
+      "prognosis_time": "3:54:15",
+      "optimum_time": "3:29:51"
     },
     {
       "distance_label": "31,1 mi",
       "distance_mi": 31.1,
       "required_pct": 123,
-      "weekly": "ca. 49 mi",
+      "weekly": "ca. 50 mi",
       "long_run": "ca. 20 mi",
       "achieved_pct": 56,
       "achieved_ok": false,
-      "prognosis_time": "5:07:25",
-      "optimum_time": "4:12:06"
+      "prognosis_time": "5:05:05",
+      "optimum_time": "4:10:00"
     },
     {
       "distance_label": "62,1 mi",
       "distance_mi": 62.1,
       "required_pct": 288,
-      "weekly": "ca. 66 mi",
+      "weekly": "ca. 67 mi",
       "long_run": "ca. 32 mi",
       "achieved_pct": 24,
       "achieved_ok": false,
-      "prognosis_time": "12:40:09",
-      "optimum_time": "8:27:49"
+      "prognosis_time": "12:33:54",
+      "optimum_time": "8:23:43"
     },
     {
       "distance_label": "100,0 mi",
       "distance_mi": 100.0,
       "required_pct": 518,
-      "weekly": "ca. 118 mi",
+      "weekly": "ca. 120 mi",
       "long_run": "ca. 40 mi",
       "achieved_pct": 13,
       "achieved_ok": false,
-      "prognosis_time": "20:23:05",
-      "optimum_time": "13:37:23"
+      "prognosis_time": "20:13:02",
+      "optimum_time": "13:30:38"
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-16T01:53:09Z"
+    "last_updated": "2025-11-16T19:13:03Z"
   }
 }
