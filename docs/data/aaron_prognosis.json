@@ -1,6 +1,6 @@
 {
   "meta": {
-    "login_detected": false,
+    "login_detected": true,
     "found": true
   },
   "entries": [
@@ -36,6 +36,6 @@
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-19T01:46:16Z"
+    "last_updated": "2025-11-20T01:46:05Z"
   }
 }
