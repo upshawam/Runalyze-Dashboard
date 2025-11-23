@@ -12,7 +12,7 @@
       "long_run": "-",
       "achieved_pct": 1079,
       "achieved_ok": true,
-      "prognosis_time": "22:42",
+      "prognosis_time": "22:40",
       "optimum_time": null
     },
     {
@@ -23,7 +23,7 @@
       "long_run": "-",
       "achieved_pct": 460,
       "achieved_ok": true,
-      "prognosis_time": "47:04",
+      "prognosis_time": "47:00",
       "optimum_time": null
     },
     {
@@ -34,7 +34,7 @@
       "long_run": "-",
       "achieved_pct": 256,
       "achieved_ok": true,
-      "prognosis_time": "1:18:10",
+      "prognosis_time": "1:18:03",
       "optimum_time": null
     },
     {
@@ -42,10 +42,10 @@
       "distance_mi": 13.1,
       "required_pct": 43,
       "weekly": "ca. 25 mi",
-      "long_run": "ca. 11 mi",
+      "long_run": "ca. 12 mi",
       "achieved_pct": 184,
       "achieved_ok": true,
-      "prognosis_time": "1:44:21",
+      "prognosis_time": "1:44:13",
       "optimum_time": null
     },
     {
@@ -56,8 +56,8 @@
       "long_run": "ca. 18 mi",
       "achieved_pct": 78,
       "achieved_ok": false,
-      "prognosis_time": "3:53:25",
-      "optimum_time": "3:36:31"
+      "prognosis_time": "3:53:05",
+      "optimum_time": "3:36:17"
     },
     {
       "distance_label": "31,1 mi",
@@ -67,8 +67,8 @@
       "long_run": "ca. 20 mi",
       "achieved_pct": 64,
       "achieved_ok": false,
-      "prognosis_time": "5:02:50",
-      "optimum_time": "4:17:49"
+      "prognosis_time": "5:02:21",
+      "optimum_time": "4:17:25"
     },
     {
       "distance_label": "62,1 mi",
@@ -78,8 +78,8 @@
       "long_run": "ca. 31 mi",
       "achieved_pct": 27,
       "achieved_ok": false,
-      "prognosis_time": "12:55:47",
-      "optimum_time": "8:39:08"
+      "prognosis_time": "12:55:00",
+      "optimum_time": "8:38:22"
     },
     {
       "distance_label": "100,0 mi",
@@ -89,11 +89,11 @@
       "long_run": "ca. 39 mi",
       "achieved_pct": 15,
       "achieved_ok": false,
-      "prognosis_time": "20:48:14",
-      "optimum_time": "13:55:37"
+      "prognosis_time": "20:46:59",
+      "optimum_time": "13:54:21"
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-22T01:41:22Z"
+    "last_updated": "2025-11-23T01:58:14Z"
   }
 }
