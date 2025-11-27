@@ -13,29 +13,29 @@
     {
       "distance_label": "3,11&nbsp;mi",
       "distance_mi": 3.11,
-      "time": "23:42",
-      "pace": "7:38/mi"
+      "time": "23:36",
+      "pace": "7:36/mi"
     },
     {
       "distance_label": "6,21&nbsp;mi",
       "distance_mi": 6.21,
-      "time": "49:11",
-      "pace": "7:55/mi"
+      "time": "48:58",
+      "pace": "7:53/mi"
     },
     {
       "distance_label": "13,11&nbsp;mi",
       "distance_mi": 13.11,
-      "time": "1:49:03",
-      "pace": "8:19/mi"
+      "time": "1:48:33",
+      "pace": "8:17/mi"
     },
     {
       "distance_label": "26,22&nbsp;mi",
       "distance_mi": 26.22,
-      "time": "3:45:55",
-      "pace": "8:37/mi"
+      "time": "3:45:01",
+      "pace": "8:35/mi"
     }
   ],
   "_meta": {
-    "last_updated": "2025-11-27T01:45:06Z"
+    "last_updated": "2025-11-27T15:50:19Z"
   }
 }
