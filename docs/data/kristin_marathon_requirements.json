@@ -10,7 +10,7 @@
       "required_pct": 7,
       "weekly": "ca. 4 mi",
       "long_run": "-",
-      "achieved_pct": 1387,
+      "achieved_pct": 1386,
       "achieved_ok": true,
       "prognosis_time": "23:55",
       "optimum_time": null
@@ -67,7 +67,7 @@
       "long_run": "ca. 19 mi",
       "achieved_pct": 82,
       "achieved_ok": false,
-      "prognosis_time": "4:52:52",
+      "prognosis_time": "4:52:58",
       "optimum_time": "4:31:11"
     },
     {
@@ -94,6 +94,6 @@
     }
   ],
   "_meta": {
-    "last_updated": "2025-12-02T01:48:41Z"
+    "last_updated": "2025-12-03T01:49:25Z"
   }
 }
