@@ -10,7 +10,7 @@
       "required_pct": 7,
       "weekly": "ca. 4 mi",
       "long_run": "-",
-      "achieved_pct": 1386,
+      "achieved_pct": 1362,
       "achieved_ok": true,
       "prognosis_time": "23:55",
       "optimum_time": null
@@ -21,7 +21,7 @@
       "required_pct": 17,
       "weekly": "ca. 10 mi",
       "long_run": "-",
-      "achieved_pct": 591,
+      "achieved_pct": 580,
       "achieved_ok": true,
       "prognosis_time": "49:38",
       "optimum_time": null
@@ -32,7 +32,7 @@
       "required_pct": 31,
       "weekly": "ca. 18 mi",
       "long_run": "-",
-      "achieved_pct": 329,
+      "achieved_pct": 323,
       "achieved_ok": true,
       "prognosis_time": "1:22:27",
       "optimum_time": null
@@ -43,7 +43,7 @@
       "required_pct": 43,
       "weekly": "ca. 24 mi",
       "long_run": "ca. 11 mi",
-      "achieved_pct": 236,
+      "achieved_pct": 232,
       "achieved_ok": true,
       "prognosis_time": "1:50:02",
       "optimum_time": null
@@ -54,10 +54,10 @@
       "required_pct": 100,
       "weekly": "ca. 41 mi",
       "long_run": "ca. 17 mi",
-      "achieved_pct": 101,
-      "achieved_ok": true,
-      "prognosis_time": "3:47:54",
-      "optimum_time": null
+      "achieved_pct": 99,
+      "achieved_ok": false,
+      "prognosis_time": "3:48:48",
+      "optimum_time": "3:47:54"
     },
     {
       "distance_label": "31,1 mi",
@@ -65,9 +65,9 @@
       "required_pct": 123,
       "weekly": "ca. 44 mi",
       "long_run": "ca. 19 mi",
-      "achieved_pct": 82,
+      "achieved_pct": 80,
       "achieved_ok": false,
-      "prognosis_time": "4:52:58",
+      "prognosis_time": "4:54:44",
       "optimum_time": "4:31:11"
     },
     {
@@ -76,7 +76,7 @@
       "required_pct": 288,
       "weekly": "ca. 60 mi",
       "long_run": "ca. 30 mi",
-      "achieved_pct": 35,
+      "achieved_pct": 34,
       "achieved_ok": false,
       "prognosis_time": "13:33:17",
       "optimum_time": "9:05:30"
@@ -94,6 +94,6 @@
     }
   ],
   "_meta": {
-    "last_updated": "2025-12-03T01:49:25Z"
+    "last_updated": "2025-12-04T01:50:37Z"
   }
 }
