@@ -10,7 +10,7 @@
       "required_pct": 7,
       "weekly": "ca. 4 mi",
       "long_run": "-",
-      "achieved_pct": 1994,
+      "achieved_pct": 1956,
       "achieved_ok": true,
       "prognosis_time": "24:13",
       "optimum_time": null
@@ -21,7 +21,7 @@
       "required_pct": 17,
       "weekly": "ca. 10 mi",
       "long_run": "-",
-      "achieved_pct": 850,
+      "achieved_pct": 834,
       "achieved_ok": true,
       "prognosis_time": "50:15",
       "optimum_time": null
@@ -32,7 +32,7 @@
       "required_pct": 31,
       "weekly": "ca. 18 mi",
       "long_run": "-",
-      "achieved_pct": 473,
+      "achieved_pct": 464,
       "achieved_ok": true,
       "prognosis_time": "1:23:31",
       "optimum_time": null
@@ -43,7 +43,7 @@
       "required_pct": 43,
       "weekly": "ca. 23 mi",
       "long_run": "ca. 11 mi",
-      "achieved_pct": 339,
+      "achieved_pct": 333,
       "achieved_ok": true,
       "prognosis_time": "1:51:29",
       "optimum_time": null
@@ -54,7 +54,7 @@
       "required_pct": 100,
       "weekly": "ca. 41 mi",
       "long_run": "ca. 17 mi",
-      "achieved_pct": 145,
+      "achieved_pct": 142,
       "achieved_ok": true,
       "prognosis_time": "3:50:47",
       "optimum_time": null
@@ -65,7 +65,7 @@
       "required_pct": 123,
       "weekly": "ca. 44 mi",
       "long_run": "ca. 19 mi",
-      "achieved_pct": 117,
+      "achieved_pct": 115,
       "achieved_ok": true,
       "prognosis_time": "4:34:37",
       "optimum_time": null
@@ -76,7 +76,7 @@
       "required_pct": 288,
       "weekly": "ca. 59 mi",
       "long_run": "ca. 30 mi",
-      "achieved_pct": 50,
+      "achieved_pct": 49,
       "achieved_ok": false,
       "prognosis_time": "13:42:39",
       "optimum_time": "9:12:09"
@@ -87,13 +87,13 @@
       "required_pct": 518,
       "weekly": "ca. 105 mi",
       "long_run": "ca. 37 mi",
-      "achieved_pct": 28,
+      "achieved_pct": 27,
       "achieved_ok": false,
       "prognosis_time": "22:03:39",
       "optimum_time": "14:48:24"
     }
   ],
   "_meta": {
-    "last_updated": "2025-12-07T01:57:36Z"
+    "last_updated": "2025-12-08T01:50:14Z"
   }
 }
