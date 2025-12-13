@@ -62,10 +62,10 @@ def auto_login(storage_path: str, username: str, password: str, browser_type: st
         context = browser.new_context()
         page = context.new_page()
         page.goto("https://runalyze.com/login")
-        # Adjust selectors if needed based on actual form
-        page.fill('input[name="_username"]', username)  # Runalyze uses _username
+        # Fill form based on actual HTML
+        page.fill('input[name="_username"]', username)
         page.fill('input[name="_password"]', password)
-        page.click('button[type="submit"]')
+        page.click('input[type="submit"]')
         page.wait_for_load_state('load', timeout=10000)
         if 'login' in page.url.lower() or page.locator('input[name="_username"]').count() > 0:
             raise Exception("Auto-login failed: still on login page")
