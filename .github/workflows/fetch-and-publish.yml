@@ -39,13 +39,35 @@ jobs:
             echo "Writing storage_kristin.json"
             echo "$STORAGE_KRISTIN" | base64 --decode > tmp/storage_kristin.json
           else
-            echo "STORAGE_KRISTIN secret not set"
+            echo "STORAGE_KRISTIN secret not set, will create new"
           fi
           if [ -n "$STORAGE_AARON" ]; then
             echo "Writing storage_aaron.json"
             echo "$STORAGE_AARON" | base64 --decode > tmp/storage_aaron.json
           else
-            echo "STORAGE_AARON secret not set"
+            echo "STORAGE_AARON secret not set, will create new"
+          fi
+
+      - name: Auto-login Kristin
+        env:
+          USERNAME: ${{ secrets.RUNALYZE_USERNAME_KRISTIN }}
+          PASSWORD: ${{ secrets.RUNALYZE_PASSWORD_KRISTIN }}
+        run: |
+          if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
+            python scripts/play_fetch_runalyze.py auto-login --storage tmp/storage_kristin.json --username "$USERNAME" --password "$PASSWORD"
+          else
+            echo "Credentials not set for Kristin"
+          fi
+
+      - name: Auto-login Aaron
+        env:
+          USERNAME: ${{ secrets.RUNALYZE_USERNAME_AARON }}
+          PASSWORD: ${{ secrets.RUNALYZE_PASSWORD_AARON }}
+        run: |
+          if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
+            python scripts/play_fetch_runalyze.py auto-login --storage tmp/storage_aaron.json --username "$USERNAME" --password "$PASSWORD"
+          else
+            echo "Credentials not set for Aaron"
           fi
 
       - name: Run fetch script for each account

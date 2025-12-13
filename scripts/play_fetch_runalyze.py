@@ -55,6 +55,24 @@ def interactive_login(storage_path: str, browser_type: str = "chromium"):
         print(f"Saved logged-in storage_state to: {storage_path}")
         browser.close()
 
+def auto_login(storage_path: str, username: str, password: str, browser_type: str = "chromium"):
+    storage_path = Path(storage_path)
+    with sync_playwright() as p:
+        browser = getattr(p, browser_type).launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        page.goto("https://runalyze.com/login")
+        # Adjust selectors if needed based on actual form
+        page.fill('input[name="_username"]', username)  # Runalyze uses _username
+        page.fill('input[name="_password"]', password)
+        page.click('button[type="submit"]')
+        page.wait_for_load_state('load', timeout=10000)
+        if 'login' in page.url.lower() or page.locator('input[name="_username"]').count() > 0:
+            raise Exception("Auto-login failed: still on login page")
+        context.storage_state(path=str(storage_path))
+        print(f"Saved auto-logged-in storage_state to: {storage_path}")
+        browser.close()
+
 def to_epoch_seconds(date_str: str):
     dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     return int(calendar.timegm(dt.timetuple()))
@@ -380,6 +398,12 @@ def main():
     p_login.add_argument("--storage", required=True, help="output storage_state json file (e.g., storage_kristin.json)")
     p_login.add_argument("--browser", choices=["chromium", "firefox", "webkit"], default="chromium", help="browser to use for interactive login")
 
+    p_auto = sub.add_parser("auto-login", help="Automatic login with credentials and save Playwright storage_state")
+    p_auto.add_argument("--storage", required=True, help="output storage_state json file")
+    p_auto.add_argument("--username", required=True, help="Runalyze username/email")
+    p_auto.add_argument("--password", required=True, help="Runalyze password")
+    p_auto.add_argument("--browser", choices=["chromium", "firefox", "webkit"], default="chromium", help="browser to use")
+
     p_fetch = sub.add_parser("fetch", help="Fetch endpoints using saved storage_state (non-interactive)")
     p_fetch.add_argument("--storage", required=True, help="path to Playwright storage_state json")
     p_fetch.add_argument("--user", required=True, help="user label for output filenames (e.g., kristin or aaron)")
@@ -393,6 +417,12 @@ def main():
             interactive_login(args.storage, browser_type=args.browser)
         except KeyboardInterrupt:
             print("Interrupted, exiting.")
+            sys.exit(1)
+    elif args.cmd == "auto-login":
+        try:
+            auto_login(args.storage, args.username, args.password, browser_type=args.browser)
+        except Exception as e:
+            print(f"Auto-login failed: {e}")
             sys.exit(1)
     elif args.cmd == "fetch":
         try:
