@@ -68,7 +68,7 @@ def fetch_with_storage(storage_state_path: str, url: str, browser_type: str = "c
         context = browser.new_context(storage_state=str(storage_state_path))
         page = context.new_page()
         try:
-            resp = page.goto(url, wait_until="networkidle", timeout=30000)
+            resp = page.goto(url, wait_until="load", timeout=60000)
             if resp is None:
                 return {"error": "no_response", "url": url}
             if prefer_page_content:
