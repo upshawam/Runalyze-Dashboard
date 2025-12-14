@@ -38,6 +38,7 @@ MARATHON_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/maratho
 VO2_TEMPLATE = "https://runalyze.com/_internal/data/athlete/history/vo2max/{from_ts}/{to_ts}"
 PROG_URL = "https://runalyze.com/plugin/RunalyzePluginPanel_Prognose/window.plot.php"
 MAR_SHAPE_PAGE = "https://runalyze.com/my/marathon-shape"
+TRAINING_PACES_URL = "https://runalyze.com/my/plugin/3003062"
 
 def utc_now_iso():
     return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -292,6 +293,61 @@ def parse_marathon_requirements_html(html_text: str):
 
     return {"meta": {"login_detected": bool(login_detected), "found": len(entries) > 0}, "entries": entries}
 
+def parse_training_paces_html(html_text: str):
+    """
+    Parse Training Paces plugin HTML into entries:
+      [{ name, pace_min, pace_max, pct_min, pct_max }, ...]
+    Also returns meta: login_detected, found
+    """
+    if not html_text or not isinstance(html_text, str):
+        return {"meta": {"login_detected": False, "found": False}, "entries": []}
+
+    lower = html_text.lower()
+    login_indicators = ['login', 'signin', 'sign in', 'two-factor', '2fa']
+    login_detected = any(tok in lower for tok in login_indicators)
+
+    # Find the panel-content
+    content_match = re.search(r'<div class="panel-content"[^>]*>(.*?)</div>', html_text, re.S | re.I)
+    if not content_match:
+        return {"meta": {"login_detected": login_detected, "found": False}, "entries": []}
+
+    content = content_match.group(1)
+    entries = []
+
+    # Find <p> elements
+    p_pattern = re.compile(r'<p>(.*?)</p>', re.S | re.I)
+    for p in p_pattern.findall(content):
+        # Extract name from <strong>
+        name_match = re.search(r'<strong>(.*?)</strong>', p, re.S | re.I)
+        name = name_match.group(1).strip() if name_match else ''
+
+        # Extract pace from <span class="right">
+        pace_match = re.search(r'<span class="right">(.*?)</span>', p, re.S | re.I)
+        pace_text = pace_match.group(1).strip() if pace_match else ''
+        # Split by -
+        paces = [x.strip() for x in pace_text.split('-')]
+        pace_min = paces[0] if len(paces) > 0 else ''
+        pace_max = paces[1] if len(paces) > 1 else pace_min
+
+        # Extract pct from <small>
+        small_match = re.search(r'<small>(.*?)</small>', p, re.S | re.I)
+        small_text = small_match.group(1).strip() if small_match else ''
+        # Parse (min - max%)
+        pct_parts = [x.strip().rstrip('%') for x in small_text.strip('()').split('-')]
+        pct_min = pct_parts[0] if pct_parts[0] != '…' else ''
+        pct_max = pct_parts[1] if len(pct_parts) > 1 else pct_min
+
+        if name:
+            entries.append({
+                "name": name,
+                "pace_min": pace_min,
+                "pace_max": pace_max,
+                "pct_min": pct_min,
+                "pct_max": pct_max
+            })
+
+    return {"meta": {"login_detected": login_detected, "found": len(entries) > 0}, "entries": entries}
+
 def fetch_prognosis(storage_state_path: str, user_label: str):
     storage_state_path = Path(storage_state_path)
     if not storage_state_path.exists():
@@ -347,6 +403,33 @@ def fetch_marathon_requirements(storage_state_path: str, user_label: str):
     raw_html_out.write_text(text, encoding="utf-8")
     return parsed
 
+def fetch_training_paces(storage_state_path: str, user_label: str):
+    storage_state_path = Path(storage_state_path)
+    if not storage_state_path.exists():
+        return {"error": "storage_state_missing", "path": str(storage_state_path)}
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(storage_state=str(storage_state_path))
+        page = context.new_page()
+        try:
+            page.goto(TRAINING_PACES_URL, wait_until="networkidle", timeout=30000)
+            text = page.content()
+        except Exception as e:
+            return {"error": "playwright_error", "exception": str(e)}
+        finally:
+            browser.close()
+
+    parsed = parse_training_paces_html(text)
+    # add last-updated meta
+    if isinstance(parsed, dict):
+        parsed.setdefault('_meta', {})
+        parsed['_meta']['last_updated'] = utc_now_iso()
+    out = DATA_DIR / f"{user_label}_training_paces.json"
+    out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+    raw_html_out = DATA_DIR / f"{user_label}_training_paces.html"
+    raw_html_out.write_text(text, encoding="utf-8")
+    return parsed
+
 def write_json_with_meta(path: Path, content):
     """
     Ensure we add a safe _meta.last_updated field without disturbing content.
@@ -389,6 +472,10 @@ def run_fetch(storage_path: str, user_label: str, from_date="2025-08-10", to_dat
     print(f"[{user_label}] Fetching marathon requirements page: {MAR_SHAPE_PAGE}")
     mr_parsed = fetch_marathon_requirements(str(storage_path), user_label)
     print(f"[{user_label}] Wrote marathon requirements (entries: {mr_parsed.get('entries') and len(mr_parsed.get('entries')) or 0})")
+
+    print(f"[{user_label}] Fetching training paces: {TRAINING_PACES_URL}")
+    tp_parsed = fetch_training_paces(str(storage_path), user_label)
+    print(f"[{user_label}] Wrote training paces (entries: {tp_parsed.get('entries') and len(tp_parsed.get('entries')) or 0})")
 
 def main():
     parser = argparse.ArgumentParser(description="Playwright helper for Runalyze storage and fetch")

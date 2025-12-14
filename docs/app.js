@@ -3,7 +3,7 @@
 // Replace your docs/app.js with this file and reload the page.
 
 const USERS = ['kristin','aaron'];
-const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements'];
+const DATA_FILES = ['vo2','marathon','prognosis','marathon_requirements','training_paces'];
 const PROJECTION_WINDOWS = [7, 14, 30, 60];
 
 const nowTag = () => '?t=' + Date.now();
@@ -188,7 +188,8 @@ async function loadAndRender(){
         vo2: results[base],
         marathon: results[base+1],
         prognosis: results[base+2],
-        requirements: results[base+3]
+        requirements: results[base+3],
+        training_paces: results[base+4]
       };
     }
 
@@ -347,6 +348,42 @@ async function loadAndRender(){
       wrapper.className = `user-table user-${u}`;
       wrapper.innerHTML = tableHtml;
       tablesEl.appendChild(wrapper);
+    });
+
+    // build paces
+    const pacesEl = el('paces');
+    pacesEl.innerHTML = '';
+
+    USERS.forEach(u => {
+      const d = users[u];
+      if(!d.training_paces || !d.training_paces.entries) return;
+
+      const pacesHtml = d.training_paces.entries.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td>${p.pace_min} - ${p.pace_max}</td>
+          <td>${p.pct_min}% - ${p.pct_max}% vVO2max</td>
+        </tr>`).join('');
+
+      const paceTableHtml = `
+        <div class="user-block user-${u}">
+          <div class="user-title">${u[0].toUpperCase()+u.slice(1)} Training Paces</div>
+        </div>
+        <table class="rz-table">
+          <thead>
+            <tr>
+              <th>Pace Type</th>
+              <th>Pace Range</th>
+              <th>% vVO2max</th>
+            </tr>
+          </thead>
+          <tbody>${pacesHtml}</tbody>
+        </table>`;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = `user-paces user-${u}`;
+      wrapper.innerHTML = paceTableHtml;
+      pacesEl.appendChild(wrapper);
     });
 
   }catch(err){
