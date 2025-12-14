@@ -17,7 +17,7 @@
 <body>
   <header style="padding:10px 12px">
     <div class="page-title">VO₂ Max & Marathon Shape</div>
-    <div class="note">Displays VO₂ trend, Runalyze-style Marathon Shape table, Training Paces, and Prognosis per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
+    <div class="note">Displays VO₂ trend, Runalyze-style Marathon Shape table, Training Paces (with chart), and Prognosis per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
   </header>
 
   <div id="errors" style="color:#b00;font-weight:700"></div>
@@ -33,6 +33,7 @@
     </div>
 
     <div class="paces-wrap">
+      <canvas id="pacesChart" aria-label="Training Paces"></canvas>
       <div id="paces" class="rz-wrapper"></div>
     </div>
 

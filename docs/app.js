@@ -169,6 +169,15 @@ function drawVo2(ctx, labels, datasets){
   vo2Chart = new Chart(ctx, { type:'line', data, options:opts });
 }
 
+// --- Chart helper (Paces) ---
+let pacesChart = null;
+function drawPaces(ctx, datasets){
+  const data = { labels: ['Recovery', 'Aerobic', 'Long/Medium long', 'Marathon', 'Lactate threshold', 'VO2max'], datasets };
+  const opts = { responsive:true, plugins:{legend:{display:true}}, scales:{y:{beginAtZero:true, title:{display:true, text:'% vVO2max'}}}, maintainAspectRatio:false };
+  if(pacesChart){ pacesChart.data = data; pacesChart.options = opts; pacesChart.update(); return; }
+  pacesChart = new Chart(ctx, { type:'bar', data, options:opts });
+}
+
 // --- Main: load data, compute projections, render chart/table ---
 async function loadAndRender(){
   const errorsEl = el('errors');
@@ -202,6 +211,16 @@ async function loadAndRender(){
       return { label: u[0].toUpperCase()+u.slice(1)+' VO₂', data, borderColor: color, backgroundColor: color.replace('1)', '0.12)'), tension:0.25, pointRadius:3, spanGaps:true };
     });
     drawVo2(el('vo2Chart').getContext('2d'), last30, datasets);
+
+    // Paces chart
+    const pacesDatasets = USERS.map((u, idx) => {
+      const d = users[u];
+      if(!d.training_paces || !d.training_paces.entries) return null;
+      const data = d.training_paces.entries.map(p => parseInt(p.pct_max));
+      const color = idx === 0 ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
+      return { label: u[0].toUpperCase()+u.slice(1)+' % vVO2max', data, backgroundColor: color.replace('1)', '0.6)'), borderColor: color, borderWidth: 1 };
+    }).filter(Boolean);
+    if(pacesDatasets.length) drawPaces(el('pacesChart').getContext('2d'), pacesDatasets);
 
     // build tables and compute projections
     const tablesEl = el('tables');
@@ -362,7 +381,7 @@ async function loadAndRender(){
         <tr>
           <td>${p.name}</td>
           <td>${p.pace_min} - ${p.pace_max}</td>
-          <td>${p.pct_min}% - ${p.pct_max}% vVO2max</td>
+          <td>${p.pct_min ? `${p.pct_min}% - ${p.pct_max}% vVO2max` : `Up to ${p.pct_max}% vVO2max`}</td>
         </tr>`).join('');
 
       const paceTableHtml = `
@@ -394,7 +413,7 @@ async function loadAndRender(){
       const d = users[u];
       if(!d.prognosis || !d.prognosis.entries) return;
 
-      const progHtml = d.prognosis.entries.map(p => `
+      const progHtml = d.prognosis.entries.filter(p => !p.distance_label.includes('1,86')).map(p => `
         <tr>
           <td>${p.distance_label || (p.distance_mi ? `${p.distance_mi} mi` : '-')}</td>
           <td>${p.time || '-'}</td>
