@@ -17,6 +17,15 @@ const fetchJSON = async p => {
 const isoToKey = iso => { const d=new Date(iso); if(isNaN(d)) return null; return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; };
 const lastNDates = n => { const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())); d.setUTCDate(d.getUTCDate()-i); out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`); } return out; };
 const nbspMi = s => (s||'').toString().replace(/(\d[\d,\.]*)\s*mi/gi,'$1\u00a0mi');
+
+// Helper to parse time "3:05:00" to minutes
+function parseTimeToMinutes(timeStr){
+  if(!timeStr) return null;
+  const parts = timeStr.split(':').map(Number);
+  if(parts.length === 3) return parts[0]*60 + parts[1] + parts[2]/60;
+  if(parts.length === 2) return parts[0] + parts[1]/60;
+  return null;
+}
 const fmtTs = ts => { if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ts; return d.toISOString().slice(0,19).replace('T',' '); };
 
 // VO2 helper (map input shapes to date->value)
@@ -178,6 +187,15 @@ function drawPaces(ctx, datasets){
   pacesChart = new Chart(ctx, { type:'bar', data, options:opts });
 }
 
+// --- Chart helper (Prognosis) ---
+let prognosisChart = null;
+function drawPrognosis(ctx, datasets){
+  const data = { labels: [], datasets };
+  const opts = { responsive:true, plugins:{legend:{display:true}}, scales:{x:{type:'time', time:{unit:'day'}}, y:{beginAtZero:false, title:{display:true, text:'Marathon Time (minutes)'}}}, maintainAspectRatio:false };
+  if(prognosisChart){ prognosisChart.data = data; prognosisChart.options = opts; prognosisChart.update(); return; }
+  prognosisChart = new Chart(ctx, { type:'line', data, options:opts });
+}
+
 // --- Main: load data, compute projections, render chart/table ---
 async function loadAndRender(){
   const errorsEl = el('errors');
@@ -202,6 +220,18 @@ async function loadAndRender(){
       };
     }
 
+    // Extract latest from history for prognosis and training_paces
+    USERS.forEach(u => {
+      if(users[u].prognosis && users[u].prognosis.history){
+        const latest = users[u].prognosis.history[users[u].prognosis.history.length - 1];
+        users[u].prognosis.entries = latest.entries;
+      }
+      if(users[u].training_paces && users[u].training_paces.history){
+        const latest = users[u].training_paces.history[users[u].training_paces.history.length - 1];
+        users[u].training_paces.entries = latest.entries;
+      }
+    });
+
     // VO2 chart
     const last30 = lastNDates(30);
     const datasets = USERS.map((u, idx) => {
@@ -221,6 +251,22 @@ async function loadAndRender(){
       return { label: u[0].toUpperCase()+u.slice(1)+' % vVO2max', data, backgroundColor: color.replace('1)', '0.6)'), borderColor: color, borderWidth: 1 };
     }).filter(Boolean);
     if(pacesDatasets.length) drawPaces(el('pacesChart').getContext('2d'), pacesDatasets);
+
+    // Prognosis chart
+    const prognosisDatasets = USERS.map((u, idx) => {
+      const d = users[u];
+      if(!d.prognosis || !d.prognosis.history) return null;
+      const data = d.prognosis.history.map(h => {
+        const marathonEntry = h.entries.find(e => e.distance_label && (e.distance_label.includes('26,2') || e.distance_label.toLowerCase().includes('marathon')));
+        if(!marathonEntry || !marathonEntry.time) return null;
+        const minutes = parseTimeToMinutes(marathonEntry.time);
+        return minutes ? {x: new Date(h.date), y: minutes} : null;
+      }).filter(Boolean);
+      if(!data.length) return null;
+      const color = idx === 0 ? 'rgba(75,192,192,1)' : 'rgba(255,99,132,1)';
+      return { label: u[0].toUpperCase()+u.slice(1)+' Marathon Prognosis', data, borderColor: color, backgroundColor: color.replace('1)', '0.12)'), tension:0.25, pointRadius:3, spanGaps:true };
+    }).filter(Boolean);
+    if(prognosisDatasets.length) drawPrognosis(el('prognosisChart').getContext('2d'), prognosisDatasets);
 
     // build tables and compute projections
     const tablesEl = el('tables');

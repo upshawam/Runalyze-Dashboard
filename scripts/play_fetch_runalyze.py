@@ -377,7 +377,24 @@ def fetch_prognosis(storage_state_path: str, user_label: str):
         parsed.setdefault('_meta', {})
         parsed['_meta']['last_updated'] = utc_now_iso()
     out = DATA_DIR / f"{user_label}_prognosis.json"
-    out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+    # Load existing and append to history
+    if out.exists():
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8"))
+            if 'history' not in existing:
+                existing = {'history': [existing]}
+            existing['history'].append({'date': utc_now_iso(), 'entries': parsed.get('entries', [])})
+            # Keep last 90 days
+            existing['history'] = existing['history'][-90:]
+            existing['_meta'] = parsed.get('_meta', {})
+            out.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        except Exception:
+            # If error, write new
+            data = {'history': [{'date': utc_now_iso(), 'entries': parsed.get('entries', [])}], '_meta': parsed.get('_meta', {})}
+            out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    else:
+        data = {'history': [{'date': utc_now_iso(), 'entries': parsed.get('entries', [])}], '_meta': parsed.get('_meta', {})}
+        out.write_text(json.dumps(data, indent=2), encoding="utf-8")
     # write raw html for debugging
     raw_html_out = DATA_DIR / f"{user_label}_prognosis.html"
     raw_html_out.write_text(text, encoding="utf-8")

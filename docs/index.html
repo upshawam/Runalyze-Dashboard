@@ -7,6 +7,7 @@
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
@@ -17,7 +18,7 @@
 <body>
   <header style="padding:10px 12px">
     <div class="page-title">VO₂ Max & Marathon Shape</div>
-    <div class="note">Displays VO₂ trend, Runalyze-style Marathon Shape table, Training Paces (with chart), and Prognosis per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
+    <div class="note">Displays VO₂ trend, Runalyze-style Marathon Shape table, Training Paces (with chart), and Prognosis (with progression chart) per user. Data loaded from docs/data/&lt;user&gt;_*.json.</div>
   </header>
 
   <div id="errors" style="color:#b00;font-weight:700"></div>
@@ -38,6 +39,7 @@
     </div>
 
     <div class="prognosis-wrap">
+      <canvas id="prognosisChart" aria-label="Marathon Prognosis Progression"></canvas>
       <div id="prognosis" class="rz-wrapper"></div>
     </div>
   </main>
