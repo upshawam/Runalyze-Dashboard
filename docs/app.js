@@ -386,6 +386,42 @@ async function loadAndRender(){
       pacesEl.appendChild(wrapper);
     });
 
+    // build prognosis
+    const prognosisEl = el('prognosis');
+    prognosisEl.innerHTML = '';
+
+    USERS.forEach(u => {
+      const d = users[u];
+      if(!d.prognosis || !d.prognosis.entries) return;
+
+      const progHtml = d.prognosis.entries.map(p => `
+        <tr>
+          <td>${p.distance_label || (p.distance_mi ? `${p.distance_mi} mi` : '-')}</td>
+          <td>${p.time || '-'}</td>
+          <td>${p.pace || '-'}</td>
+        </tr>`).join('');
+
+      const progTableHtml = `
+        <div class="user-block user-${u}">
+          <div class="user-title">${u[0].toUpperCase()+u.slice(1)} Prognosis</div>
+        </div>
+        <table class="rz-table">
+          <thead>
+            <tr>
+              <th>Distance</th>
+              <th>Time</th>
+              <th>Pace</th>
+            </tr>
+          </thead>
+          <tbody>${progHtml}</tbody>
+        </table>`;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = `user-prognosis user-${u}`;
+      wrapper.innerHTML = progTableHtml;
+      prognosisEl.appendChild(wrapper);
+    });
+
   }catch(err){
     if(el('errors')) el('errors').textContent = err.message || String(err);
     console.error(err);
