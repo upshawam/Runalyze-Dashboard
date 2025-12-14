@@ -306,8 +306,15 @@ def parse_training_paces_html(html_text: str):
     login_indicators = ['login', 'signin', 'sign in', 'two-factor', '2fa']
     login_detected = any(tok in lower for tok in login_indicators)
 
-    # Find the panel-content
-    content_match = re.search(r'<div class="panel-content"[^>]*>(.*?)</div>', html_text, re.S | re.I)
+    # Find the panel-content after "Training paces" heading
+    # First find the h1 with "Training paces"
+    h1_match = re.search(r'<h1[^>]*>\s*Training paces\s*</h1>', html_text, re.I)
+    if not h1_match:
+        return {"meta": {"login_detected": login_detected, "found": False}, "entries": []}
+
+    # Now find the next panel-content after that
+    after_h1 = html_text[h1_match.end():]
+    content_match = re.search(r'<div class="panel-content"[^>]*>(.*?)</div>', after_h1, re.S | re.I)
     if not content_match:
         return {"meta": {"login_detected": login_detected, "found": False}, "entries": []}
 
