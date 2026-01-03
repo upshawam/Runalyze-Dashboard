@@ -775,9 +775,44 @@
           "pace": "8:13/mi"
         }
       ]
+    },
+    {
+      "date": "2026-01-03T01:49:21Z",
+      "entries": [
+        {
+          "distance_label": "1,86&nbsp;mi",
+          "distance_mi": 1.86,
+          "time": "Poster generator",
+          "pace": "from"
+        },
+        {
+          "distance_label": "3,11&nbsp;mi",
+          "distance_mi": 3.11,
+          "time": "22:09",
+          "pace": "7:08/mi"
+        },
+        {
+          "distance_label": "6,21&nbsp;mi",
+          "distance_mi": 6.21,
+          "time": "45:56",
+          "pace": "7:24/mi"
+        },
+        {
+          "distance_label": "13,11&nbsp;mi",
+          "distance_mi": 13.11,
+          "time": "1:41:52",
+          "pace": "7:46/mi"
+        },
+        {
+          "distance_label": "26,22&nbsp;mi",
+          "distance_mi": 26.22,
+          "time": "3:36:26",
+          "pace": "8:15/mi"
+        }
+      ]
     }
   ],
   "_meta": {
-    "last_updated": "2026-01-02T01:56:02Z"
+    "last_updated": "2026-01-03T01:49:21Z"
   }
 }
