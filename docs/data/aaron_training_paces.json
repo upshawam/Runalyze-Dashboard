@@ -1,53 +1,6 @@
 {
   "history": [
     {
-      "date": "2026-01-04T02:07:23Z",
-      "entries": [
-        {
-          "name": "Recovery",
-          "pace_min": "8:53/mi",
-          "pace_max": "\u2026",
-          "pct_min": "",
-          "pct_max": "70<abbr title=\"%vVO2max\">%</abbr>"
-        },
-        {
-          "name": "Aerobic",
-          "pace_min": "8:17/mi",
-          "pace_max": "9:43/mi",
-          "pct_min": "64",
-          "pct_max": "75<abbr title=\"%vVO2max\">%</abbr>"
-        },
-        {
-          "name": "Long/Medium long",
-          "pace_min": "7:58/mi",
-          "pace_max": "9:01/mi",
-          "pct_min": "69",
-          "pct_max": "78<abbr title=\"%vVO2max\">%</abbr>"
-        },
-        {
-          "name": "Marathon",
-          "pace_min": "7:27/mi",
-          "pace_max": "8:32/mi",
-          "pct_min": "73",
-          "pct_max": "83<abbr title=\"%vVO2max\">%</abbr>"
-        },
-        {
-          "name": "Lactate threshold",
-          "pace_min": "6:46/mi",
-          "pace_max": "6:55/mi",
-          "pct_min": "90",
-          "pct_max": "92<abbr title=\"%vVO2max\">%</abbr>"
-        },
-        {
-          "name": "VO2max",
-          "pace_min": "6:13/mi",
-          "pace_max": "6:33/mi",
-          "pct_min": "95",
-          "pct_max": "100<abbr title=\"%vVO2max\">%</abbr>"
-        }
-      ]
-    },
-    {
       "date": "2026-01-05T02:07:17Z",
       "entries": [
         {
@@ -1409,9 +1362,56 @@
           "pct_max": "100<abbr title=\"%vVO2max\">%</abbr>"
         }
       ]
+    },
+    {
+      "date": "2026-02-01T00:42:32Z",
+      "entries": [
+        {
+          "name": "Recovery",
+          "pace_min": "8:40/mi",
+          "pace_max": "\u2026",
+          "pct_min": "",
+          "pct_max": "70<abbr title=\"%vVO2max\">%</abbr>"
+        },
+        {
+          "name": "Aerobic",
+          "pace_min": "8:06/mi",
+          "pace_max": "9:28/mi",
+          "pct_min": "64",
+          "pct_max": "75<abbr title=\"%vVO2max\">%</abbr>"
+        },
+        {
+          "name": "Long/Medium long",
+          "pace_min": "7:47/mi",
+          "pace_max": "8:48/mi",
+          "pct_min": "69",
+          "pct_max": "78<abbr title=\"%vVO2max\">%</abbr>"
+        },
+        {
+          "name": "Marathon",
+          "pace_min": "7:16/mi",
+          "pace_max": "8:19/mi",
+          "pct_min": "73",
+          "pct_max": "83<abbr title=\"%vVO2max\">%</abbr>"
+        },
+        {
+          "name": "Lactate threshold",
+          "pace_min": "6:36/mi",
+          "pace_max": "6:44/mi",
+          "pct_min": "90",
+          "pct_max": "92<abbr title=\"%vVO2max\">%</abbr>"
+        },
+        {
+          "name": "VO2max",
+          "pace_min": "6:04/mi",
+          "pace_max": "6:23/mi",
+          "pct_min": "95",
+          "pct_max": "100<abbr title=\"%vVO2max\">%</abbr>"
+        }
+      ]
     }
   ],
   "_meta": {
-    "last_updated": "2026-01-31T00:34:27Z"
+    "last_updated": "2026-02-01T00:42:32Z"
   }
 }
