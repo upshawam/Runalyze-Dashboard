@@ -82,7 +82,6 @@ jobs:
           python scripts/play_fetch_runalyze.py fetch --storage tmp/storage_aaron.json   --user aaron   --from-date "$FROM_DATE" --to-date "$TO_DATE" || echo "aaron fetch failed"
           ls -la docs/data || true
 
-      - name: Commit and push updated docs (use PAT)
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
