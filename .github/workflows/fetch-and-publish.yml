@@ -25,8 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
-          pip install playwright
+          pip install -r requirements.txt
           playwright install --with-deps
 
       - name: Prepare storage files from secrets
@@ -84,14 +83,14 @@ jobs:
           ls -la docs/data || true
 
       - name: Commit and push updated docs (use PAT)
-        env:
-          GIT_COMMITTER_NAME: "github-actions[bot]"
-          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
-        run: |
-          git config user.name "${GIT_COMMITTER_NAME}"
-          git config user.email "${GIT_COMMITTER_EMAIL}"
-          # use PAT stored in ACTIONS_PAT secret for authenticated push
-          git remote set-url origin https://x-access-token:${{ secrets.ACTIONS_PAT }}@github.com/${{ github.repository }}.git
-          git add docs/data || true
-          git commit -m "ci: update runalyze data (automated)" || echo "No changes to commit"
-          git push origin HEAD:main
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.ACTIONS_PAT }}
+          branch: runalyze-data-update
+          delete-branch: true
+          title: "ci: update runalyze data (automated)"
+          commit-message: "ci: update runalyze data (automated)"
+          body: "Automated data update from Runalyze fetch job"
+          add-paths: |
+            docs/data/
