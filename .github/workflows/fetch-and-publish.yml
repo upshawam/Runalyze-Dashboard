@@ -86,7 +86,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           branch: runalyze-data-update
           delete-branch: true
           title: "ci: update runalyze data (automated)"
