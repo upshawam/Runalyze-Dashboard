@@ -303,13 +303,9 @@ def sanitize_html_tokens(html_text: str) -> str:
         return html_text
     
     # Replace Mapbox tokens (pk.xxx or sk.xxx patterns)
+    # These are JWT tokens that contain dots, so we need to match them properly
     html_text = re.sub(
-        r'Runalyze\.Options\.setMapboxLayerAuth\("pk\.[a-zA-Z0-9_-]+"\)',
-        'Runalyze.Options.setMapboxLayerAuth("[MAPBOX_TOKEN_REMOVED]")',
-        html_text
-    )
-    html_text = re.sub(
-        r'Runalyze\.Options\.setMapboxLayerAuth\("sk\.[a-zA-Z0-9_-]+"\)',
+        r'Runalyze\.Options\.setMapboxLayerAuth\("(?:pk|sk)\.[a-zA-Z0-9_\.\-]+"\)',
         'Runalyze.Options.setMapboxLayerAuth("[MAPBOX_TOKEN_REMOVED]")',
         html_text
     )
