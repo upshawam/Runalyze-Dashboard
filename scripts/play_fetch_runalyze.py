@@ -293,6 +293,43 @@ def parse_marathon_requirements_html(html_text: str):
 
     return {"meta": {"login_detected": bool(login_detected), "found": len(entries) > 0}, "entries": entries}
 
+def sanitize_html_tokens(html_text: str) -> str:
+    """
+    Remove sensitive authentication tokens from HTML content.
+    This includes Mapbox, Nokia, and Thunderforest API keys that GitHub's
+    Push Protection might flag as secrets.
+    """
+    if not html_text or not isinstance(html_text, str):
+        return html_text
+    
+    # Replace Mapbox tokens (pk.xxx or sk.xxx patterns)
+    html_text = re.sub(
+        r'Runalyze\.Options\.setMapboxLayerAuth\("pk\.[a-zA-Z0-9_-]+"\)',
+        'Runalyze.Options.setMapboxLayerAuth("[MAPBOX_TOKEN_REMOVED]")',
+        html_text
+    )
+    html_text = re.sub(
+        r'Runalyze\.Options\.setMapboxLayerAuth\("sk\.[a-zA-Z0-9_-]+"\)',
+        'Runalyze.Options.setMapboxLayerAuth("[MAPBOX_TOKEN_REMOVED]")',
+        html_text
+    )
+    
+    # Replace Nokia/HERE layer auth tokens
+    html_text = re.sub(
+        r'Runalyze\.Options\.setNokiaLayerAuth\("[^"]+",\s*"[^"]+"\)',
+        'Runalyze.Options.setNokiaLayerAuth("[REMOVED]", "[REMOVED]")',
+        html_text
+    )
+    
+    # Replace Thunderforest tokens
+    html_text = re.sub(
+        r'Runalyze\.Options\.setThunderforestLayerAuth\("[^"]+"\)',
+        'Runalyze.Options.setThunderforestLayerAuth("[REMOVED]")',
+        html_text
+    )
+    
+    return html_text
+
 def parse_training_paces_html(html_text: str):
     """
     Parse Training Paces plugin HTML into entries:
@@ -397,7 +434,7 @@ def fetch_prognosis(storage_state_path: str, user_label: str):
         out.write_text(json.dumps(data, indent=2), encoding="utf-8")
     # write raw html for debugging
     raw_html_out = DATA_DIR / f"{user_label}_prognosis.html"
-    raw_html_out.write_text(text, encoding="utf-8")
+    raw_html_out.write_text(sanitize_html_tokens(text), encoding="utf-8")
     return parsed
 
 def fetch_marathon_requirements(storage_state_path: str, user_label: str):
@@ -424,7 +461,7 @@ def fetch_marathon_requirements(storage_state_path: str, user_label: str):
     out = DATA_DIR / f"{user_label}_marathon_requirements.json"
     out.write_text(json.dumps(parsed, indent=2), encoding="utf-8")
     raw_html_out = DATA_DIR / f"{user_label}_marathon_requirements.html"
-    raw_html_out.write_text(text, encoding="utf-8")
+    raw_html_out.write_text(sanitize_html_tokens(text), encoding="utf-8")
     return parsed
 
 def fetch_training_paces(storage_state_path: str, user_label: str):
@@ -468,7 +505,7 @@ def fetch_training_paces(storage_state_path: str, user_label: str):
         data = {'history': [{'date': utc_now_iso(), 'entries': parsed.get('entries', [])}], '_meta': parsed.get('_meta', {})}
         out.write_text(json.dumps(data, indent=2), encoding="utf-8")
     raw_html_out = DATA_DIR / f"{user_label}_training_paces.html"
-    raw_html_out.write_text(text, encoding="utf-8")
+    raw_html_out.write_text(sanitize_html_tokens(text), encoding="utf-8")
     return parsed
 
 def write_json_with_meta(path: Path, content):
