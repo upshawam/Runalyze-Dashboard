@@ -2280,9 +2280,32 @@
           "pace": "8:17/mi"
         }
       ]
+    },
+    {
+      "date": "2026-03-15T00:54:34Z",
+      "entries": [
+        {
+          "distance_label": "1,86&nbsp;mi",
+          "distance_mi": 1.86,
+          "time": "Fatigue",
+          "pace": "from"
+        },
+        {
+          "distance_label": "6,21&nbsp;mi",
+          "distance_mi": 6.21,
+          "time": "-",
+          "pace": "from"
+        },
+        {
+          "distance_label": "26,22&nbsp;mi",
+          "distance_mi": 26.22,
+          "time": "-",
+          "pace": "from"
+        }
+      ]
     }
   ],
   "_meta": {
-    "last_updated": "2026-02-11T00:41:03Z"
+    "last_updated": "2026-03-15T00:54:34Z"
   }
 }
