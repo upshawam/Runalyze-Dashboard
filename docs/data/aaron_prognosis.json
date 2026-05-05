@@ -2280,9 +2280,44 @@
           "pace": "8:12/mi"
         }
       ]
+    },
+    {
+      "date": "2026-05-05T01:01:54Z",
+      "entries": [
+        {
+          "distance_label": "1,86&nbsp;mi",
+          "distance_mi": 1.86,
+          "time": "Fatigue",
+          "pace": "from"
+        },
+        {
+          "distance_label": "3,11&nbsp;mi",
+          "distance_mi": 3.11,
+          "time": "22:48",
+          "pace": "7:20/mi"
+        },
+        {
+          "distance_label": "6,21&nbsp;mi",
+          "distance_mi": 6.21,
+          "time": "47:17",
+          "pace": "7:37/mi"
+        },
+        {
+          "distance_label": "13,11&nbsp;mi",
+          "distance_mi": 13.11,
+          "time": "1:44:50",
+          "pace": "8:00/mi"
+        },
+        {
+          "distance_label": "26,22&nbsp;mi",
+          "distance_mi": 26.22,
+          "time": "4:10:49",
+          "pace": "9:34/mi"
+        }
+      ]
     }
   ],
   "_meta": {
-    "last_updated": "2026-02-11T00:42:16Z"
+    "last_updated": "2026-05-05T01:01:54Z"
   }
 }
